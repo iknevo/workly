@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toast";
+import { TRPCReactProvider } from "@/trpc/client";
 
 import "./globals.css";
 
@@ -29,7 +31,10 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <ClerkProvider afterSignOutUrl="/">
-            <TooltipProvider>{children}</TooltipProvider>
+            <TRPCReactProvider>
+              <Toaster />
+              <TooltipProvider>{children}</TooltipProvider>
+            </TRPCReactProvider>
           </ClerkProvider>
         </ThemeProvider>
       </body>
