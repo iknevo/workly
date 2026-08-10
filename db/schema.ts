@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -12,6 +13,65 @@ import {
 import { defineRelations } from "drizzle-orm";
 
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
+
+import { z } from "zod";
+
+export const profileLinkSchema = z.object({
+  label: z.string().trim().min(1, "Link label is required").max(100, "Label is too long"),
+  url: z.string().trim().url("Link must be a valid URL"),
+});
+
+export const profileExperienceSchema = z.object({
+  role: z.string().trim().min(1, "Role is required").max(200, "Role is too long"),
+  company: z.string().trim().min(1, "Company is required").max(200, "Company is too long"),
+  location: z.string().trim().max(200, "Location is too long").nullish(),
+  startDate: z.string().trim().max(50).nullish(),
+  endDate: z.string().trim().max(50).nullish(),
+  summary: z.string().max(2000).nullish(),
+  bullets: z.array(z.string().trim().min(1)).default([]),
+});
+
+export const profileEducationSchema = z.object({
+  school: z.string().trim().min(1, "School is required").max(200, "School is too long"),
+  degree: z.string().trim().min(1, "Degree is required").max(200, "Degree is too long"),
+  field: z.string().trim().max(200).nullish(),
+  startYear: z.string().trim().max(20).nullish(),
+  endYear: z.string().trim().max(20).nullish(),
+  notes: z.string().max(2000).nullish(),
+});
+
+export const profileProjectSchema = z.object({
+  name: z.string().trim().min(1, "Project name is required").max(200, "Name is too long"),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Description is required")
+    .max(3000, "Description is too long"),
+  link: z.string().trim().url("Link must be a valid URL").nullish(),
+  tech: z.array(z.string().trim().min(1)).default([]),
+});
+
+export const profileSkillsSchema = z.array(z.string().trim().min(1)).default([]);
+
+export const profileUpdateSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
+  email: z.string().trim().email("Email must be valid").max(200).nullish(),
+  headline: z.string().trim().max(300).nullish(),
+  phone: z.string().trim().max(100).nullish(),
+  location: z.string().trim().max(200).nullish(),
+  summary: z.string().trim().max(5000).nullish(),
+  skills: profileSkillsSchema,
+  experience: z.array(profileExperienceSchema).default([]),
+  education: z.array(profileEducationSchema).default([]),
+  projects: z.array(profileProjectSchema).default([]),
+  links: z.array(profileLinkSchema).default([]),
+});
+
+export type ProfileLink = z.infer<typeof profileLinkSchema>;
+export type ProfileExperience = z.infer<typeof profileExperienceSchema>;
+export type ProfileEducation = z.infer<typeof profileEducationSchema>;
+export type ProfileProject = z.infer<typeof profileProjectSchema>;
+export type UserProfile = z.infer<typeof profileUpdateSchema>;
 
 export const applicationStatus = pgEnum("application_status", [
   "draft",
@@ -42,6 +102,12 @@ export const users = pgTable(
     headline: text("headline"),
     phone: text("phone"),
     location: text("location"),
+    summary: text("summary"),
+    skills: jsonb("skills").$type<string[]>(),
+    experience: jsonb("experience").$type<ProfileExperience[]>(),
+    education: jsonb("education").$type<ProfileEducation[]>(),
+    projects: jsonb("projects").$type<ProfileProject[]>(),
+    links: jsonb("links").$type<ProfileLink[]>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

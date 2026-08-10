@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { generateTailoredResume } from "@/lib/ai";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { buildResumeLatex, hasResumeData } from "@/lib/resume";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const applicationsRouter = createTRPCRouter({
@@ -161,7 +162,7 @@ export const applicationsRouter = createTRPCRouter({
     .input(
       z.object({
         applicationId: z.string().uuid(),
-        baseResumeId: z.string().uuid(),
+        baseResumeId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -183,13 +184,29 @@ export const applicationsRouter = createTRPCRouter({
 
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const [baseResume] = await db
-        .select()
-        .from(resumes)
-        .where(and(eq(resumes.id, input.baseResumeId), eq(resumes.userId, user.id)))
-        .limit(1);
+      let baseContent: string;
+      let baseResumeId: string | null = null;
 
-      if (!baseResume) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.baseResumeId) {
+        const [baseResume] = await db
+          .select()
+          .from(resumes)
+          .where(and(eq(resumes.id, input.baseResumeId), eq(resumes.userId, user.id)))
+          .limit(1);
+
+        if (!baseResume) throw new TRPCError({ code: "NOT_FOUND" });
+
+        baseContent = baseResume.content;
+        baseResumeId = baseResume.id;
+      } else {
+        if (!hasResumeData(user)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Your profile needs some content first. Add your experience, skills, or projects in Settings.",
+          });
+        }
+        baseContent = buildResumeLatex(user);
+      }
 
       if (!application.jobDescription) {
         throw new TRPCError({
@@ -199,7 +216,7 @@ export const applicationsRouter = createTRPCRouter({
       }
 
       const content = await generateTailoredResume({
-        baseResume: baseResume.content,
+        baseResume: baseContent,
         jobDescription: application.jobDescription,
         company: application.company,
         position: application.position,
@@ -209,7 +226,7 @@ export const applicationsRouter = createTRPCRouter({
         .insert(applicationResumes)
         .values({
           applicationId: application.id,
-          baseResumeId: baseResume.id,
+          baseResumeId,
           content,
           model: "llama-3.3-70b-versatile",
           jobDescriptionSnapshot: application.jobDescription,

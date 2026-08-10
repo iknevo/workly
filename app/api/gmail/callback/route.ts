@@ -14,16 +14,23 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get("error");
 
   if (error || !code) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error`);
+    const reason = error
+      ? `Google returned: ${error}`
+      : "No authorization code was returned.";
+    return NextResponse.redirect(
+      `${req.nextUrl.origin}/settings?gmail=error&reason=${encodeURIComponent(reason)}`
+    );
   }
 
   if (!state) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error`);
+    return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error&reason=Missing state`);
   }
 
   const [user] = await db.select().from(users).where(eq(users.id, state)).limit(1);
   if (!user) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error`);
+    return NextResponse.redirect(
+      `${req.nextUrl.origin}/settings?gmail=error&reason=Account not found`
+    );
   }
 
   try {
@@ -31,15 +38,25 @@ export async function GET(req: NextRequest) {
     const { tokens } = await oauth2Client.getToken(code);
 
     if (!tokens.refresh_token || !tokens.access_token || !tokens.expiry_date) {
-      return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error`);
+      return NextResponse.redirect(
+        `${req.nextUrl.origin}/settings?gmail=error&reason=Google did not return valid tokens`
+      );
     }
+
+    oauth2Client.setCredentials({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expiry_date: tokens.expiry_date,
+    });
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
     const profile = await gmail.users.getProfile({ userId: "me" });
     const email = profile.data.emailAddress;
 
     if (!email) {
-      return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error`);
+      return NextResponse.redirect(
+        `${req.nextUrl.origin}/settings?gmail=error&reason=Could not read the account email`
+      );
     }
 
     await db
@@ -64,7 +81,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=success`);
   } catch (err) {
+    const reason =
+      err instanceof Error ? err.message.replace(/["']/g, "") : "Unknown error";
     console.error("Gmail OAuth callback error", err);
-    return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error`);
+    return NextResponse.redirect(
+      `${req.nextUrl.origin}/settings?gmail=error&reason=${encodeURIComponent(reason)}`
+    );
   }
 }

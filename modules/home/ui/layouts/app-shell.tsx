@@ -1,17 +1,22 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
+import {
+  CalendarDays,
+  FileText,
+  LayoutDashboard,
+  ListChecks,
+  Settings,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
-
-import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -24,10 +29,6 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-
-import { CalendarDays, FileText, LayoutDashboard, ListChecks, Settings, Sparkles } from "lucide-react";
-
-import { UserButton } from "@clerk/nextjs";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -78,13 +79,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <UserButton showName />
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
@@ -92,9 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex flex-1 items-center justify-end gap-2">
-            <Link href="/applications/new" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              New application
-            </Link>
+            <UserButton />
           </div>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
