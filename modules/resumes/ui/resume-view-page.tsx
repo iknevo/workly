@@ -1,22 +1,55 @@
 "use client";
 
 import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { ResumeCodeViewer } from "./resume-code-viewer";
 
 import Link from "next/link";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Eye, Loader2, Pencil } from "lucide-react";
+import { useState } from "react";
 
 export function ResumeViewPage({ resumeId }: { resumeId: string }) {
   const trpc = useTRPC();
 
   const resumeQuery = useQuery(trpc.resumes.getOne.queryOptions({ id: resumeId }));
   const resume = resumeQuery.data;
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const compile = useMutation(
+    trpc.resumes.compile.mutationOptions({
+      onSuccess: (result) => {
+        const bytes = Uint8Array.from(atob(result.pdfBase64), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+        setPreviewUrl(url);
+        setPreviewOpen(true);
+      },
+      onError: (error) => {
+        toast.add({ type: "error", title: "Preview failed", description: error.message });
+      },
+    })
+  );
+
+  const closePreview = () => {
+    setPreviewOpen(false);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -33,13 +66,24 @@ export function ResumeViewPage({ resumeId }: { resumeId: string }) {
           </div>
         </div>
         {resume && (
-          <Link
-            href={`/resumes/${resume.id}/edit`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <Pencil />
-            Edit
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => compile.mutate({ content: resume.content })}
+              disabled={compile.isPending}
+            >
+              {compile.isPending ? <Loader2 className="animate-spin" /> : <Eye />}
+              Preview
+            </Button>
+            <Link
+              href={`/resumes/${resume.id}/edit`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <Pencil />
+              Edit
+            </Link>
+          </div>
         )}
       </div>
 
@@ -52,6 +96,26 @@ export function ResumeViewPage({ resumeId }: { resumeId: string }) {
           )}
         </CardContent>
       </Card>
+
+      <Sheet open={previewOpen} onOpenChange={(open) => !open && closePreview()}>
+        <SheetContent side="right" className="data-[side=right]:sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Preview</SheetTitle>
+            <SheetDescription>
+              {resume?.title ?? "Resume"} · compiled PDF of this base resume.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-4">
+            {previewUrl && (
+              <iframe
+                src={previewUrl}
+                className="h-[calc(100vh-8rem)] w-full rounded-lg border bg-white"
+                title="PDF preview"
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
