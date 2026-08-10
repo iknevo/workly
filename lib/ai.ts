@@ -6,6 +6,14 @@ import { env } from "@/config/env";
 const groq = env.GROQ_API_KEY ? createGroq({ apiKey: env.GROQ_API_KEY }) : null;
 
 export const RESUME_MODEL = "llama-3.3-70b-versatile";
+export const RESUME_MAX_OUTPUT_TOKENS = 4096;
+export const RESUME_MAX_JOB_DESCRIPTION_CHARS = 8000;
+export const RESUME_MAX_RESUME_CHARS = 16000;
+
+function truncate(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n\n[truncated — review the full job description if needed]`;
+}
 
 export function isAIEnabled(): boolean {
   return groq !== null;
@@ -44,10 +52,10 @@ export async function generateTailoredResume(
 Position: ${position}
 
 === JOB DESCRIPTION ===
-${jobDescription}
+${truncate(jobDescription, RESUME_MAX_JOB_DESCRIPTION_CHARS)}
 
 === ORIGINAL RESUME (LaTeX) ===
-${baseResume}
+${truncate(baseResume, RESUME_MAX_RESUME_CHARS)}
 
 Rewrite the resume above so it is tailored to this job. Output only the LaTeX source.`;
 
@@ -56,7 +64,7 @@ Rewrite the resume above so it is tailored to this job. Output only the LaTeX so
     system: SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.4,
-    maxOutputTokens: 12000,
+    maxOutputTokens: RESUME_MAX_OUTPUT_TOKENS,
   });
 
   return stripLatexFences(text);

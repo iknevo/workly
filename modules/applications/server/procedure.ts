@@ -202,7 +202,7 @@ export const applicationsRouter = createTRPCRouter({
         if (!hasResumeData(user)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Your profile needs some content first. Add your experience, skills, or projects in Settings.",
+            message: "Your profile needs some content first. Add your experience, skills, or projects on the Profile page.",
           });
         }
         baseContent = buildResumeLatex(user);

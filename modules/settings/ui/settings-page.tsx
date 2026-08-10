@@ -1,52 +1,43 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Mail, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Mail, Plus, Trash2, UserRound } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
-import type { users as usersTable } from "@/db/schema";
 import { useTRPC } from "@/trpc/client";
-
-type Me = typeof usersTable.$inferSelect;
 
 export function SettingsPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
-  const meQuery = useQuery(trpc.users.getMe.queryOptions());
   const accountsQuery = useQuery(trpc.mail.getAccounts.queryOptions());
   const configuredQuery = useQuery(trpc.mail.isConfigured.queryOptions());
 
-  const me = meQuery.data;
   const accounts = accountsQuery.data ?? [];
   const configured = configuredQuery.data?.configured ?? false;
 
+  const gmailError = searchParams.get("gmail") === "error" ? searchParams.get("reason") : null;
+  const gmailSuccess = searchParams.get("gmail") === "success";
+
   useEffect(() => {
-    const gmail = searchParams.get("gmail");
-    if (gmail === "success") {
+    if (gmailSuccess) {
       toast.add({
         type: "success",
         title: "Gmail connected",
         description: "Email tracking is ready.",
       });
-    } else if (gmail === "error") {
-      toast.add({
-        type: "error",
-        title: "Gmail connection failed",
-        description: "Please try again.",
-      });
     }
-  }, [searchParams]);
+  }, [gmailSuccess]);
 
   const getAuthUrl = useMutation(
     trpc.mail.getAuthUrl.mutationOptions({
@@ -74,23 +65,44 @@ export function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Your profile, resume defaults, and connected accounts.
+          Your profile and connected accounts.
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
-          <CardDescription>These details feed your base resumes.</CardDescription>
+          <CardDescription>
+            All your personal data lives on your profile. Applications and the AI pull from it.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {meQuery.isLoading || !me ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <ProfileForm me={me} />
-          )}
+        <CardContent className="flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            Basics, skills, experience, education, projects, and links.
+          </p>
+          <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            <UserRound />
+            Edit profile
+          </Link>
         </CardContent>
       </Card>
+
+      {gmailError ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Gmail connection failed</AlertTitle>
+          <AlertDescription className="break-all">
+            {gmailError || "Unknown error"}{" "}
+            <span className="text-muted-foreground">
+              — make sure the exact redirect URI
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                /api/gmail/callback
+              </code>
+              is registered in Google Cloud Console.
+            </span>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -146,92 +158,6 @@ export function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function ProfileForm({ me }: { me: Me }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  const [form, setForm] = useState({
-    name: me.name ?? "",
-    email: me.email ?? "",
-    headline: me.headline ?? "",
-    phone: me.phone ?? "",
-    location: me.location ?? "",
-  });
-
-  const updateMe = useMutation(
-    trpc.users.updateMe.mutationOptions({
-      onSuccess: () => {
-        toast.add({ type: "success", title: "Profile updated" });
-        queryClient.invalidateQueries({ queryKey: trpc.users.getMe.queryKey() });
-      },
-      onError: (error) =>
-        toast.add({ type: "error", title: "Failed to update", description: error.message }),
-    })
-  );
-
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [key]: e.target.value }));
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="name">Full name</Label>
-          <Input id="name" value={form.name} onChange={set("name")} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={form.email} onChange={set("email")} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="headline">Headline</Label>
-          <Input
-            id="headline"
-            value={form.headline}
-            onChange={set("headline")}
-            placeholder="Senior Software Engineer, 8 years experience"
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="phone">Phone</Label>
-          <Input
-            id="phone"
-            value={form.phone}
-            onChange={set("phone")}
-            placeholder="+1 (555) 000-0000"
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="location">Location</Label>
-          <Input
-            id="location"
-            value={form.location}
-            onChange={set("location")}
-            placeholder="Remote / New York, NY"
-          />
-        </div>
-      </div>
-      <div className="flex justify-end">
-        <Button
-          onClick={() =>
-            updateMe.mutate({
-              name: form.name,
-              email: form.email || null,
-              headline: form.headline || null,
-              phone: form.phone || null,
-              location: form.location || null,
-            })
-          }
-          disabled={updateMe.isPending || form.name.trim().length === 0}
-        >
-          {updateMe.isPending && <Loader2 className="animate-spin" />}
-          Save profile
-        </Button>
-      </div>
     </div>
   );
 }

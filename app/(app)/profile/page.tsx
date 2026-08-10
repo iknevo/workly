@@ -3,18 +3,17 @@ import { auth } from "@clerk/nextjs/server";
 
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 
-import { SettingsPage } from "@/modules/settings/ui/settings-page";
+import { ProfilePage } from "@/modules/profile/ui/profile-page";
 
-export default async function SettingsRoute() {
+export default async function ProfileRoute() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  prefetch(trpc.mail.getAccounts.queryOptions());
-  prefetch(trpc.mail.isConfigured.queryOptions());
+  prefetch(trpc.users.getMe.queryOptions());
 
   return (
     <HydrateClient>
-      <SettingsPage />
+      <ProfilePage />
     </HydrateClient>
   );
 }

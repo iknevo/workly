@@ -131,7 +131,7 @@ function ResumeCard({
       </CardContent>
 
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl!">
           <DialogHeader>
             <DialogTitle>{resume.title}</DialogTitle>
             <DialogDescription>LaTeX source for this base resume.</DialogDescription>
@@ -141,7 +141,7 @@ function ResumeCard({
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl!">
           <DialogHeader>
             <DialogTitle>Edit resume</DialogTitle>
             <DialogDescription>Update the LaTeX source of this resume.</DialogDescription>

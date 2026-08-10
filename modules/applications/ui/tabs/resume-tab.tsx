@@ -1,11 +1,12 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Select,
   SelectContent,
@@ -23,14 +25,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
-import { cn } from "@/lib/utils";
-
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
 import { ResumeCodeViewer } from "@/modules/resumes/ui/resume-code-viewer";
-
-import { Loader2, Sparkles, Trash2 } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
 
 export function ResumeTab({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
@@ -40,6 +36,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
   const [viewResumeId, setViewResumeId] = useState<string | null>(null);
 
   const resumesQuery = useQuery(trpc.resumes.getMany.queryOptions());
+  const profileQuery = useQuery(trpc.users.getMe.queryOptions());
   const applicationResumesQuery = useQuery(
     trpc.applications.getResumes.queryOptions({ applicationId })
   );
@@ -47,10 +44,23 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
   const resumes = resumesQuery.data ?? [];
   const applicationResumes = applicationResumesQuery.data ?? [];
 
+  const profile = profileQuery.data;
+  const profileHasData = Boolean(
+    profile?.experience?.length ||
+    profile?.skills?.length ||
+    profile?.projects?.length ||
+    profile?.education?.length
+  );
+  const hasBaseResume = Boolean(selectedBaseResume);
+
   const generate = useMutation(
     trpc.applications.generateResume.mutationOptions({
       onSuccess: () => {
-        toast.add({ type: "success", title: "Resume tailored", description: "Your AI resume is ready." });
+        toast.add({
+          type: "success",
+          title: "Resume tailored",
+          description: "Your AI resume is ready.",
+        });
         setSelectedBaseResume("");
         queryClient.invalidateQueries({
           queryKey: trpc.applications.getResumes.queryKey({ applicationId }),
@@ -85,19 +95,24 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
             Tailor your resume
           </CardTitle>
           <CardDescription>
-            Pick a base resume and the AI will rewrite it to match this job&apos;s description. Add
-            the job description on the Overview tab first.
+            Pick a base resume and the AI will rewrite it to match this job&apos;s description — or
+            skip it and generate straight from your profile. Add the job description on the Overview
+            tab first.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex min-w-56 flex-col gap-2">
               <span className="text-xs font-medium text-muted-foreground">Base resume</span>
-              <Select value={selectedBaseResume} onValueChange={(v) => setSelectedBaseResume(v ?? "")}>
+              <Select
+                value={selectedBaseResume || "none"}
+                onValueChange={(v) => setSelectedBaseResume(v === "none" ? "" : (v ?? ""))}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a resume" />
+                  <SelectValue placeholder="None (use my profile)" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false}>
+                  <SelectItem value="none">None</SelectItem>
                   {resumes.map((resume) => (
                     <SelectItem key={resume.id} value={resume.id}>
                       {resume.title}
@@ -107,17 +122,23 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
               </Select>
             </div>
             <Button
-              onClick={() => generate.mutate({ applicationId, baseResumeId: selectedBaseResume })}
-              disabled={generate.isPending || !selectedBaseResume || resumes.length === 0}
+              onClick={() =>
+                generate.mutate({
+                  applicationId,
+                  baseResumeId: selectedBaseResume || undefined,
+                })
+              }
+              disabled={generate.isPending}
             >
-              {generate.isPending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Sparkles />
-              )}
-              Generate tailored resume
+              {generate.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              {hasBaseResume ? "Generate tailored resume" : "Generate from my profile"}
             </Button>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {profileHasData
+              ? "No base resume selected — the AI builds from your profile."
+              : "Your profile is empty. Add experience or skills on the Profile page, or select a base resume."}
+          </p>
         </CardContent>
       </Card>
 
@@ -203,7 +224,7 @@ function ResumeViewerDialog({
 
   return (
     <Dialog open={resumeId !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-5xl!">
         <DialogHeader>
           <DialogTitle>Tailored resume</DialogTitle>
           <DialogDescription>

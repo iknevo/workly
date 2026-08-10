@@ -8,6 +8,7 @@ import {
   ListChecks,
   Settings,
   Sparkles,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -35,6 +36,7 @@ const navItems = [
   { href: "/applications", label: "Applications", icon: ListChecks },
   { href: "/resumes", label: "Resumes", icon: FileText },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

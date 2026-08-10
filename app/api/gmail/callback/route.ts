@@ -26,6 +26,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error&reason=Missing state`);
   }
 
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state)) {
+    return NextResponse.redirect(`${req.nextUrl.origin}/settings?gmail=error&reason=Invalid state`);
+  }
+
   const [user] = await db.select().from(users).where(eq(users.id, state)).limit(1);
   if (!user) {
     return NextResponse.redirect(
