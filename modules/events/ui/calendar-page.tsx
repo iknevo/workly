@@ -6,15 +6,15 @@ import { DayButton, DayPicker } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { cn } from "@/lib/utils";
@@ -67,19 +67,21 @@ export function CalendarPage() {
             Interviews, follow-ups, and deadlines across all applications.
           </p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button size="sm" />}>
+        <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+          <SheetTrigger render={<Button size="sm" />}>
             <Plus />
             Add event
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add event</DialogTitle>
-              <DialogDescription>Schedule an interview, follow-up, or deadline.</DialogDescription>
-            </DialogHeader>
-            <EventFormDialog onClose={() => setCreateOpen(false)} />
-          </DialogContent>
-        </Dialog>
+          </SheetTrigger>
+          <SheetContent side="right" className="data-[side=right]:sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>Add event</SheetTitle>
+              <SheetDescription>Schedule an interview, follow-up, or deadline.</SheetDescription>
+            </SheetHeader>
+            <div className="px-4 pb-4">
+              <EventFormDialog onClose={() => setCreateOpen(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {eventsQuery.isLoading ? (

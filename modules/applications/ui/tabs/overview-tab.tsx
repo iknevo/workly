@@ -1,47 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { toast } from "@/components/ui/toast";
 
 import { cn } from "@/lib/utils";
 
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
 import type { applications } from "@/db/schema";
 import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
-import { ApplicationForm } from "@/modules/applications/ui/application-form";
 
 import { ExternalLink, Pencil } from "lucide-react";
 
 type Application = typeof applications.$inferSelect;
 
 export function OverviewTab({ application }: { application: Application }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [editOpen, setEditOpen] = useState(false);
-
-  const update = useMutation(
-    trpc.applications.update.mutationOptions({
-      onSuccess: () => {
-        toast.add({ type: "success", title: "Application updated" });
-        setEditOpen(false);
-        queryClient.invalidateQueries({ queryKey: trpc.applications.getOne.queryKey({ id: application.id }) });
-        queryClient.invalidateQueries({ queryKey: trpc.applications.getMany.queryKey() });
-      },
-      onError: (error) => {
-        toast.add({ type: "error", title: "Failed to update", description: error.message });
-      },
-    })
-  );
-
   const statusConfig = APPLICATION_STATUS_CONFIG[application.status];
 
   return (
@@ -52,24 +26,13 @@ export function OverviewTab({ application }: { application: Application }) {
             <CardTitle>Details</CardTitle>
             <CardDescription>Everything you know about this application.</CardDescription>
           </div>
-          <Dialog open={editOpen} onOpenChange={setEditOpen}>
-            <DialogTrigger render={<button className={buttonVariants({ variant: "outline", size: "sm" })} />}>
-              <Pencil />
-              Edit
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit application</DialogTitle>
-                <DialogDescription>Update the details for {application.company}.</DialogDescription>
-              </DialogHeader>
-              <ApplicationForm
-                initial={application}
-                onSubmit={(data) => update.mutate({ id: application.id, ...(data as object) })}
-                submitLabel="Save changes"
-                submitting={update.isPending}
-              />
-            </DialogContent>
-          </Dialog>
+          <Link
+            href={`/applications/${application.id}/edit`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <Pencil />
+            Edit
+          </Link>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2">

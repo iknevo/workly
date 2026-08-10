@@ -4,29 +4,17 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 
 import { cn } from "@/lib/utils";
@@ -35,9 +23,10 @@ import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { EVENT_TYPE_CONFIG } from "@/modules/applications/constants";
+import { EventFormDialog } from "@/modules/events/ui/event-form-dialog";
 
 import { format } from "date-fns";
-import { CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 export function TimelineTab({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
@@ -68,7 +57,7 @@ export function TimelineTab({ applicationId }: { applicationId: string }) {
           <h2 className="text-lg font-semibold">Timeline</h2>
           <p className="text-sm text-muted-foreground">Key dates for this application.</p>
         </div>
-        <EventDialog applicationId={applicationId} />
+        <AddEventSheet applicationId={applicationId} />
       </div>
 
       {eventsQuery.isLoading ? (
@@ -127,134 +116,24 @@ export function TimelineTab({ applicationId }: { applicationId: string }) {
   );
 }
 
-function EventDialog({ applicationId }: { applicationId: string }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
+function AddEventSheet({ applicationId }: { applicationId: string }) {
   const [open, setOpen] = useState(false);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [type, setType] = useState<"offer" | "application" | "interview" | "followup" | "deadline" | "other">("other");
-  const [startTime, setStartTime] = useState<Date | undefined>(undefined);
-
-  const create = useMutation(
-    trpc.events.create.mutationOptions({
-      onSuccess: () => {
-        toast.add({ type: "success", title: "Event added" });
-        setOpen(false);
-        setTitle("");
-        setDescription("");
-        setType("other");
-        setStartTime(undefined);
-        queryClient.invalidateQueries({
-          queryKey: trpc.events.getManyForApplication.queryKey({ applicationId }),
-        });
-        queryClient.invalidateQueries({ queryKey: trpc.events.getManyForMonth.queryKey() });
-      },
-      onError: (error) => toast.add({ type: "error", title: "Failed to add", description: error.message }),
-    })
-  );
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={<Button size="sm" />}>
         <Plus />
         Add event
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add event</DialogTitle>
-          <DialogDescription>Add a date to this application&apos;s timeline.</DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="event-title">Title</Label>
-            <Input
-              id="event-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Phone screen with recruiter"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>Type</Label>
-            <Select value={type} onValueChange={(v) => setType((v ?? "other") as typeof type)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(EVENT_TYPE_CONFIG).map(([value, config]) => (
-                  <SelectItem key={value} value={value}>
-                    {config.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>Date and time</Label>
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button variant="outline" className="justify-start text-left font-normal" />
-                }
-              >
-                <CalendarIcon className="mr-2 size-4" />
-                {startTime ? (
-                  format(startTime, "PPP 'at' p")
-                ) : (
-                  <span className="text-muted-foreground">Pick a date and time</span>
-                )}
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={startTime}
-                  onSelect={(date) => {
-                    if (date) {
-                      const now = new Date();
-                      date.setHours(now.getHours(), now.getMinutes(), 0, 0);
-                      setStartTime(date);
-                    }
-                  }}
-                  autoFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="event-description">Description</Label>
-            <Textarea
-              id="event-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Zoom link, interviewer name..."
-              rows={3}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                startTime &&
-                create.mutate({
-                  applicationId,
-                  title,
-                  description: description || null,
-                  type,
-                  startTime,
-                })
-              }
-              disabled={create.isPending || !title.trim() || !startTime}
-            >
-              {create.isPending && <Loader2 className="animate-spin" />}
-              Add event
-            </Button>
-          </div>
+      </SheetTrigger>
+      <SheetContent side="right" className="data-[side=right]:sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Add event</SheetTitle>
+          <SheetDescription>Add a date to this application&apos;s timeline.</SheetDescription>
+        </SheetHeader>
+        <div className="px-4 pb-4">
+          <EventFormDialog applicationId={applicationId} onClose={() => setOpen(false)} />
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

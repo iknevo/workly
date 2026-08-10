@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Select,
@@ -223,20 +223,22 @@ function ResumeViewerDialog({
   const resume = resumeQuery.data;
 
   return (
-    <Dialog open={resumeId !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl!">
-        <DialogHeader>
-          <DialogTitle>Tailored resume</DialogTitle>
-          <DialogDescription>
+    <Sheet open={resumeId !== null} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="data-[side=right]:sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle>Tailored resume</SheetTitle>
+          <SheetDescription>
             Generated {resume?.createdAt?.toLocaleString() ?? ""} · view or copy the LaTeX source.
-          </DialogDescription>
-        </DialogHeader>
-        {resumeQuery.isLoading ? (
-          <Skeleton className="h-96 w-full" />
-        ) : resume ? (
-          <ResumeCodeViewer content={resume.content} />
-        ) : null}
-      </DialogContent>
-    </Dialog>
+          </SheetDescription>
+        </SheetHeader>
+        <div className="px-4 pb-4">
+          {resumeQuery.isLoading ? (
+            <Skeleton className="h-96 w-full" />
+          ) : resume ? (
+            <ResumeCodeViewer content={resume.content} />
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
