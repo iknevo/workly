@@ -16,62 +16,113 @@ import { createInsertSchema, createSelectSchema, createUpdateSchema } from "driz
 
 import { z } from "zod";
 
+const isUrl = (v: string) => z.string().url().safeParse(v).success;
+const isEmail = (v: string) => z.string().email().safeParse(v).success;
+
 export const profileLinkSchema = z.object({
-  label: z.string().trim().min(1, "Link label is required").max(100, "Label is too long"),
-  url: z.string().trim().url("Link must be a valid URL"),
+  label: z.string().trim().max(100, "Label is too long"),
+  url: z.string().trim().refine((v) => v === "" || isUrl(v), {
+    message: "Link must be a valid URL",
+  }),
 });
 
-export const profileExperienceSchema = z.object({
-  role: z.string().trim().min(1, "Role is required").max(200, "Role is too long"),
-  company: z.string().trim().min(1, "Company is required").max(200, "Company is too long"),
-  location: z.string().trim().max(200, "Location is too long").nullish(),
-  startDate: z.string().trim().max(50).nullish(),
-  endDate: z.string().trim().max(50).nullish(),
-  summary: z.string().max(2000).nullish(),
-  bullets: z.array(z.string().trim().min(1)).default([]),
-});
+export const profileExperienceSchema = z
+  .object({
+    role: z.string().trim().max(200, "Role is too long"),
+    company: z.string().trim().max(200, "Company is too long"),
+    location: z.string().trim().max(200, "Location is too long"),
+    startDate: z.string().trim().max(50),
+    endDate: z.string().trim().max(50),
+    summary: z.string().trim().max(2000),
+    bullets: z.array(z.string().trim().max(500)),
+  })
+  .transform((e) => ({
+    role: e.role,
+    company: e.company,
+    location: e.location || null,
+    startDate: e.startDate || null,
+    endDate: e.endDate || null,
+    summary: e.summary || null,
+    bullets: e.bullets.filter(Boolean),
+  }));
 
-export const profileEducationSchema = z.object({
-  school: z.string().trim().min(1, "School is required").max(200, "School is too long"),
-  degree: z.string().trim().min(1, "Degree is required").max(200, "Degree is too long"),
-  field: z.string().trim().max(200).nullish(),
-  startYear: z.string().trim().max(20).nullish(),
-  endYear: z.string().trim().max(20).nullish(),
-  notes: z.string().max(2000).nullish(),
-});
+export const profileEducationSchema = z
+  .object({
+    school: z.string().trim().max(200, "School is too long"),
+    degree: z.string().trim().max(200, "Degree is too long"),
+    field: z.string().trim().max(200),
+    startYear: z.string().trim().max(20),
+    endYear: z.string().trim().max(20),
+    notes: z.string().trim().max(2000),
+  })
+  .transform((e) => ({
+    school: e.school,
+    degree: e.degree,
+    field: e.field || null,
+    startYear: e.startYear || null,
+    endYear: e.endYear || null,
+    notes: e.notes || null,
+  }));
 
-export const profileProjectSchema = z.object({
-  name: z.string().trim().min(1, "Project name is required").max(200, "Name is too long"),
-  description: z
-    .string()
-    .trim()
-    .min(1, "Description is required")
-    .max(3000, "Description is too long"),
-  link: z.string().trim().url("Link must be a valid URL").nullish(),
-  tech: z.array(z.string().trim().min(1)).default([]),
-});
+export const profileProjectSchema = z
+  .object({
+    name: z.string().trim().max(200, "Name is too long"),
+    description: z.string().trim().max(3000, "Description is too long"),
+    link: z.string().trim().refine((v) => v === "" || isUrl(v), {
+      message: "Link must be a valid URL",
+    }),
+    tech: z.array(z.string().trim().max(100)),
+  })
+  .transform((p) => ({
+    name: p.name,
+    description: p.description,
+    link: p.link || null,
+    tech: p.tech.filter(Boolean),
+  }));
 
-export const profileSkillsSchema = z.array(z.string().trim().min(1)).default([]);
+export const profileSkillsSchema = z.array(z.string().trim().max(100));
 
-export const profileUpdateSchema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
-  email: z.string().trim().email("Email must be valid").max(200).nullish(),
-  headline: z.string().trim().max(300).nullish(),
-  phone: z.string().trim().max(100).nullish(),
-  location: z.string().trim().max(200).nullish(),
-  summary: z.string().trim().max(5000).nullish(),
-  skills: profileSkillsSchema,
-  experience: z.array(profileExperienceSchema).default([]),
-  education: z.array(profileEducationSchema).default([]),
-  projects: z.array(profileProjectSchema).default([]),
-  links: z.array(profileLinkSchema).default([]),
-});
+export const profileUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
+    email: z.string().trim().refine((v) => v === "" || isEmail(v), {
+      message: "Email must be valid",
+    }),
+    headline: z.string().trim().max(300),
+    phone: z.string().trim().max(100),
+    location: z.string().trim().max(200),
+    summary: z.string().trim().max(5000),
+    skills: profileSkillsSchema,
+    experience: z.array(profileExperienceSchema),
+    education: z.array(profileEducationSchema),
+    projects: z.array(profileProjectSchema),
+    links: z.array(profileLinkSchema),
+  })
+  .transform((v) => ({
+    name: v.name,
+    email: v.email || null,
+    headline: v.headline || null,
+    phone: v.phone || null,
+    location: v.location || null,
+    summary: v.summary || null,
+    skills: v.skills.filter(Boolean),
+    experience: v.experience.filter((e) => e.role && e.company),
+    education: v.education.filter((e) => e.school && e.degree),
+    projects: v.projects.filter((p) => p.name && p.description),
+    links: v.links.filter((l) => l.label && l.url),
+  }));
 
 export type ProfileLink = z.infer<typeof profileLinkSchema>;
 export type ProfileExperience = z.infer<typeof profileExperienceSchema>;
 export type ProfileEducation = z.infer<typeof profileEducationSchema>;
 export type ProfileProject = z.infer<typeof profileProjectSchema>;
 export type UserProfile = z.infer<typeof profileUpdateSchema>;
+
+export type ProfileFormInput = z.input<typeof profileUpdateSchema>;
+export type ProfileExperienceInput = z.input<typeof profileExperienceSchema>;
+export type ProfileEducationInput = z.input<typeof profileEducationSchema>;
+export type ProfileProjectInput = z.input<typeof profileProjectSchema>;
+export type ProfileLinkInput = z.input<typeof profileLinkSchema>;
 
 export const applicationStatus = pgEnum("application_status", [
   "draft",

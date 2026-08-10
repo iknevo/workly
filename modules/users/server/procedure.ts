@@ -43,11 +43,11 @@ export const usersRouter = createTRPCRouter({
         .update(users)
         .set({
           name: input.name,
-          email: input.email ?? null,
-          headline: input.headline ?? null,
-          phone: input.phone ?? null,
-          location: input.location ?? null,
-          summary: input.summary ?? null,
+          email: input.email,
+          headline: input.headline,
+          phone: input.phone,
+          location: input.location,
+          summary: input.summary,
           skills: input.skills,
           experience: input.experience,
           education: input.education,
