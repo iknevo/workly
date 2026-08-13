@@ -2,10 +2,16 @@
 
 import { Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { Controller } from "react-hook-form";
+import type { Control } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+import type { ProfileFormInput } from "@/db/schema";
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -13,6 +19,79 @@ export function Field({ label, children }: { label: string; children: React.Reac
       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
     </div>
+  );
+}
+
+type ProjectFieldPrefix = `projects.${number}` | `experience.${number}.projects.${number}`;
+
+export function ProjectFields({
+  prefix,
+  control,
+}: {
+  prefix: ProjectFieldPrefix;
+  control: Control<ProfileFormInput>;
+}) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Controller
+          name={`${prefix}.name` as const}
+          control={control}
+          render={({ field }) => (
+            <Field label="Name">
+              <Input {...field} placeholder="Workly" />
+            </Field>
+          )}
+        />
+        <Controller
+          name={`${prefix}.previewUrl` as const}
+          control={control}
+          render={({ field, fieldState }) => (
+            <div className="flex flex-col gap-2">
+              <Field label="Preview URL">
+                <Input {...field} value={field.value ?? ""} placeholder="https://demo..." />
+              </Field>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </div>
+          )}
+        />
+        <Controller
+          name={`${prefix}.sourceCodeUrl` as const}
+          control={control}
+          render={({ field, fieldState }) => (
+            <div className="flex flex-col gap-2">
+              <Field label="Source code URL">
+                <Input {...field} value={field.value ?? ""} placeholder="https://github.com/..." />
+              </Field>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </div>
+          )}
+        />
+      </div>
+      <Controller
+        name={`${prefix}.description` as const}
+        control={control}
+        render={({ field }) => (
+          <Field label="Description">
+            <Textarea {...field} placeholder="What did you build and why does it matter?" rows={3} />
+          </Field>
+        )}
+      />
+      <Controller
+        name={`${prefix}.tech` as const}
+        control={control}
+        render={({ field }) => (
+          <Field label="Tech">
+            <TagsEditor
+              value={field.value}
+              onChange={field.onChange}
+              placeholder="e.g. Next.js, tRPC, PostgreSQL"
+              addLabel="Add tech"
+            />
+          </Field>
+        )}
+      />
+    </>
   );
 }
 
@@ -38,68 +117,23 @@ export function SectionCard({
   );
 }
 
-export function SectionList<T>({
-  items,
-  onChange,
-  onAdd,
-  addLabel,
-  emptyText,
-  renderItem,
-}: {
-  items: T[];
-  onChange: (next: T[]) => void;
-  onAdd: () => void;
-  addLabel: string;
-  emptyText: string;
-  renderItem: (
-    item: T,
-    onChangeItem: (next: T) => void,
-    onRemove: () => void,
-    index: number
-  ) => React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      {items.length === 0 ? (
-        <p className="py-4 text-center text-sm text-muted-foreground">{emptyText}</p>
-      ) : (
-        items.map((item, i) =>
-          renderItem(
-            item,
-            (next) => {
-              const nextItems = [...items];
-              nextItems[i] = next;
-              onChange(nextItems);
-            },
-            () => onChange(items.filter((_, j) => j !== i)),
-            i
-          )
-        )
-      )}
-      <div>
-        <Button variant="outline" size="sm" onClick={onAdd}>
-          <Plus />
-          {addLabel}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function TagsEditor({
   value,
   onChange,
   placeholder,
   addLabel,
+  disabled = false,
 }: {
   value: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
   addLabel: string;
+  disabled?: boolean;
 }) {
   const [input, setInput] = useState("");
 
   const add = () => {
+    if (disabled) return;
     const tag = input.trim();
     if (!tag) return;
     onChange([...value, tag]);
@@ -123,6 +157,7 @@ export function TagsEditor({
                 onClick={() => onChange(value.filter((_, j) => j !== i))}
                 className="text-muted-foreground hover:text-foreground"
                 aria-label={`Remove ${tag}`}
+                disabled={disabled}
               >
                 <X className="size-3" />
               </button>
@@ -135,6 +170,7 @@ export function TagsEditor({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={placeholder}
+          disabled={disabled}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -142,7 +178,7 @@ export function TagsEditor({
             }
           }}
         />
-        <Button variant="outline" size="sm" onClick={add} disabled={!input.trim()}>
+        <Button variant="outline" size="sm" onClick={add} disabled={disabled || !input.trim()}>
           <Plus />
           {addLabel}
         </Button>

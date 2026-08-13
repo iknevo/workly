@@ -1,22 +1,67 @@
 import type { ProfileEducation, ProfileExperience, ProfileLink, ProfileProject } from "@/db/schema";
 
-const LATEX_PREAMBLE = `\\documentclass[11pt,a4paper]{article}
+const LATEX_PREAMBLE = `\\documentclass[11pt, a4paper]{article}
 
 \\usepackage[utf8]{inputenc}
 \\usepackage[T1]{fontenc}
 \\usepackage{geometry}
-\\geometry{left=1.2cm, right=1.2cm, top=1.2cm, bottom=1.2cm}
-\\usepackage{titlesec}
-\\usepackage{enumitem}
-\\usepackage{hyperref}
 \\usepackage{xcolor}
-\\hypersetup{colorlinks=true, urlcolor=blue}
+\\usepackage{hyperref}
+\\usepackage{array}
+\\usepackage{parskip}
+\\usepackage{enumitem}
+\\usepackage{titlesec}
 
-\\setlength{\\parindent}{0pt}
-\\titleformat{\\section}{\\large\\bfseries}{}{0em}{}[\\vspace{-0.4em}\\rule{\\textwidth}{0.4pt}]
-\\titlespacing*{\\section}{0pt}{0.8em}{0.4em}
+% Custom colors
+\\definecolor{primary}{HTML}{000000}
+\\definecolor{secondary}{HTML}{000000}
+\\definecolor{accent}{HTML}{3a3a3a}
 
+% Set margins
+\\geometry{
+    left=1.5cm,
+    right=1.5cm,
+    top=1.5cm,
+    bottom=1.5cm
+}
+
+% Section styling
+\\titleformat{\\section}
+    {\\large\\bfseries\\color{primary}}
+    {}
+    {0em}
+    {}
+    [\\titlerule]
+
+% Remove page numbers
 \\pagestyle{empty}
+
+% Itemize styling
+\\setlist[itemize]{leftmargin=*, nosep}
+\\renewcommand{\\labelitemi}{\\color{accent}\\textbullet}
+
+% Header command
+\\newcommand{\\header}[3]{
+    \\begin{flushleft}
+        {\\Huge\\bfseries\\color{primary}#1}\\\\
+        \\vspace{4pt}
+        {\\large\\color{secondary}#2}\\\\
+        \\vspace{8pt}
+        #3
+    \\end{flushleft}
+}
+
+% Experience command
+\\newcommand{\\experience}[4]{
+    \\textbf{\\color{primary}#1} \\hfill \\textbf{\\color{secondary}#2}\\\\
+    \\textit{#3} \\hfill \\textit{#4}
+}
+
+% Education command
+\\newcommand{\\education}[4]{
+    \\textbf{\\color{primary}#1} \\hfill \\textbf{\\color{secondary}#2}\\\\
+    \\textit{#3} \\hfill \\textit{#4}
+}
 `;
 
 export interface ResumeProfile {
@@ -74,33 +119,55 @@ export function hasResumeData(profile: ResumeProfile): boolean {
   );
 }
 
+function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+}
+
+function projectLinkBullet(project: {
+  previewUrl?: string | null;
+  sourceCodeUrl?: string | null;
+}): string {
+  const parts: string[] = [];
+  const preview = project.previewUrl?.trim();
+  const source = project.sourceCodeUrl?.trim();
+  if (preview) parts.push(`\\href{${escapeLatexUrl(preview)}}{(Live Demo)}`);
+  if (source) parts.push(`\\href{${escapeLatexUrl(source)}}{(GitHub Repo)}`);
+  return parts.join(" ");
+}
+
 export function buildResumeLatex(profile: ResumeProfile): string {
   const sections: string[] = [];
 
   const name = escapeLatex(profile.name?.trim() ?? "");
-  const headline = profile.headline?.trim();
-  const contact = [
-    profile.email?.trim() ? escapeLatex(profile.email.trim()) : "",
-    profile.phone?.trim() ? escapeLatex(profile.phone.trim()) : "",
-    profile.location?.trim() ? escapeLatex(profile.location.trim()) : "",
-  ].filter(Boolean);
+  const headline = escapeLatex(profile.headline?.trim() ?? "");
+  const location = profile.location?.trim();
+  const phone = profile.phone?.trim();
+  const email = profile.email?.trim();
   const links = (profile.links ?? []).filter((l) => l.label.trim() && l.url.trim());
 
-  const header: string[] = [];
-  if (name) header.push(`\\LARGE\\textbf{${name}}\\\\[0.2em]`);
-  if (headline) header.push(`\\normalsize ${escapeLatex(headline)}\\\\[0.2em]`);
-  if (contact.length) header.push(`\\normalsize ${contact.join(" $\\mid$ ")}\\\\[0.2em]`);
-  if (links.length) {
-    header.push(
-      `\\normalsize ${links
-        .map((l) => `\\href{${escapeLatexUrl(l.url.trim())}}{${escapeLatex(l.label.trim())}}`)
-        .join(" $\\mid$ ")}`
+  const headerLines: string[] = [];
+  if (location) headerLines.push(`Location: ${escapeLatex(location)}`);
+  if (phone) {
+    const wa = phone.replace(/\D/g, "");
+    if (wa) {
+      headerLines.push(`\\href{https://wa.me/${wa}}{phone \\& whatsapp: ${escapeLatex(phone)}}`);
+    }
+  }
+  if (email) {
+    headerLines.push(`\\href{mailto:${escapeLatexUrl(email)}}{email: ${escapeLatex(email)}}`);
+  }
+  for (const link of links) {
+    headerLines.push(
+      `\\href{${escapeLatexUrl(link.url.trim())}}{${escapeLatex(link.label.trim())}: ${escapeLatex(displayUrl(link.url.trim()))}}`
     );
   }
 
-  if (header.length) {
-    sections.push(`\\begin{center}\n    ${header.join("\n    ")}\n\\end{center}`);
-  }
+  sections.push(
+    `\\header
+{${name}}
+{${headline}}
+{${headerLines.join(" \\\\\n")}}`
+  );
 
   if (profile.summary?.trim()) {
     sections.push(`\\section{Summary}\n${escapeLatex(profile.summary.trim())}`);
@@ -111,16 +178,50 @@ export function buildResumeLatex(profile: ResumeProfile): string {
       .map((exp) => {
         const role = escapeLatex(exp.role.trim());
         const company = escapeLatex(exp.company.trim());
+        const expLocation = exp.location?.trim() ? escapeLatex(exp.location.trim()) : "";
         const period = [exp.startDate?.trim(), exp.endDate?.trim()].filter(Boolean).join(" --- ");
         const lines: string[] = [];
-        lines.push(`\\textbf{${role}} \\hfill ${company} \\\\[-0.3em]`);
-        if (period) lines.push(`\\textit{${escapeLatex(period)}}`);
-        if (exp.summary?.trim()) lines.push(escapeLatex(exp.summary.trim()));
-        const bullets = (exp.bullets ?? []).map((b) => b.trim()).filter(Boolean);
+        lines.push(
+          `\\experience{${role}}{${period || " "}}{${company}}{${expLocation || " "}}`
+        );
+        const bullets: string[] = [];
+        if (exp.summary?.trim()) bullets.push(escapeLatex(exp.summary.trim()));
+        for (const bullet of exp.bullets ?? []) {
+          const text = bullet.trim();
+          if (text) bullets.push(escapeLatex(text));
+        }
         if (bullets.length) {
           lines.push(
-            `\\begin{itemize}[leftmargin=1em, itemsep=0pt]\n${bullets
-              .map((b) => `    \\item ${escapeLatex(b)}`)
+            `\\begin{itemize}\n${bullets.map((b) => `    \\item ${b}`).join("\n")}\n\\end{itemize}`
+          );
+        }
+        const projects = (exp.projects ?? [])
+          .map((project) => project.name.trim() ? project : null)
+          .filter((project): project is NonNullable<typeof project> => project !== null);
+        if (projects.length) {
+          const projectItems = projects.map((project) => {
+            const projectName = escapeLatex(project.name.trim());
+            const tech = (project.tech ?? []).map((t) => t.trim()).filter(Boolean);
+            const techPart = tech.length ? ` (${escapeLatex(tech.join(", "))})` : "";
+            const projectBullets: string[] = [];
+            if (project.description?.trim()) {
+              projectBullets.push(escapeLatex(project.description.trim()));
+            }
+            const linksBullet = projectLinkBullet(project);
+            if (linksBullet) projectBullets.push(linksBullet);
+            const projectLines = [`\\item \\textbf{${projectName}}${techPart}`];
+            if (projectBullets.length) {
+              projectLines.push(
+                `  \\begin{itemize}[nosep, label={--}]\n${projectBullets
+                  .map((b) => `    \\item ${b}`)
+                  .join("\n")}\n  \\end{itemize}`
+              );
+            }
+            return projectLines.join("\n");
+          });
+          lines.push(
+            `\\begin{itemize}\n${projectItems
+              .map((item) => `    ${item}`)
               .join("\n")}\n\\end{itemize}`
           );
         }
@@ -137,11 +238,14 @@ export function buildResumeLatex(profile: ResumeProfile): string {
         const degree = escapeLatex(edu.degree.trim());
         const field = edu.field?.trim() ? escapeLatex(edu.field.trim()) : "";
         const years = [edu.startYear?.trim(), edu.endYear?.trim()].filter(Boolean).join(" --- ");
-        const lines: string[] = [];
         const title = [degree, field].filter(Boolean).join(", ");
-        lines.push(`\\textbf{${title}} \\hfill ${school} \\\\[-0.3em]`);
-        if (years) lines.push(`\\textit{${escapeLatex(years)}}`);
-        if (edu.notes?.trim()) lines.push(escapeLatex(edu.notes.trim()));
+        const lines: string[] = [];
+        lines.push(`\\education{${title}}{${years || " "}}{${school}}{}`);
+        if (edu.notes?.trim()) {
+          lines.push(
+            `\\begin{itemize}\n    \\item ${escapeLatex(edu.notes.trim())}\n\\end{itemize}`
+          );
+        }
         return lines.join("\n");
       })
       .filter(Boolean);
@@ -151,24 +255,36 @@ export function buildResumeLatex(profile: ResumeProfile): string {
   if (profile.projects?.length) {
     const items = profile.projects
       .map((project) => {
-        const name = escapeLatex(project.name.trim());
-        const link = project.link?.trim();
+        const projectName = escapeLatex(project.name.trim());
         const tech = (project.tech ?? []).map((t) => t.trim()).filter(Boolean);
-        const lines: string[] = [];
-        const title = link ? `\\textbf{${name}} \\hfill \\href{${escapeLatexUrl(link)}}{link}` : `\\textbf{${name}}`;
-        lines.push(title);
-        lines.push(escapeLatex(project.description.trim()));
-        if (tech.length) lines.push(`\\textit{Tech:} ${escapeLatex(tech.join(", "))}`);
+        const techPart = tech.length ? ` (${escapeLatex(tech.join(", "))})` : "";
+        const bullets: string[] = [];
+        if (project.description?.trim()) bullets.push(escapeLatex(project.description.trim()));
+        const linksBullet = projectLinkBullet(project);
+        if (linksBullet) bullets.push(linksBullet);
+        const lines = [`\\item \\textbf{${projectName}}${techPart}`];
+        if (bullets.length) {
+          lines.push(
+            `  \\begin{itemize}[nosep, label={--}]\n${bullets
+              .map((b) => `    \\item ${b}`)
+              .join("\n")}\n  \\end{itemize}`
+          );
+        }
         return lines.join("\n");
       })
       .filter(Boolean);
-    sections.push(`\\section{Projects}\n${items.join("\n\n")}`);
+    sections.push(`\\section{Projects}\n\\begin{itemize}\n${items.join("\n")}\n\\end{itemize}`);
   }
 
-  if (profile.skills?.length) {
-    sections.push(`\\section{Skills}\n${escapeLatex(profile.skills.map((s) => s.trim()).filter(Boolean).join(", "))}`);
+  const skills = (profile.skills ?? []).map((s) => s.trim()).filter(Boolean);
+  if (skills.length) {
+    sections.push(
+      `\\section{Skills \\& Tools}\n\\begin{itemize}\n${skills
+        .map((s) => `    \\item ${escapeLatex(s)}`)
+        .join("\n")}\n\\end{itemize}`
+    );
   }
 
-  const body = sections.join("\n\n\\vspace{0.4em}\n\n");
+  const body = sections.join("\n\n");
   return `${LATEX_PREAMBLE}\n\\begin{document}\n\n${body}\n\n\\end{document}\n`;
 }

@@ -42,7 +42,7 @@ export function NewApplication() {
         </CardHeader>
         <CardContent>
           <ApplicationForm
-            onSubmit={(data) => create.mutate(data as never)}
+            onSubmit={(data) => create.mutate(data)}
             submitLabel="Create application"
             submitting={create.isPending}
           />

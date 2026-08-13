@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -26,15 +27,36 @@ export const profileLinkSchema = z.object({
   }),
 });
 
+export const profileProjectSchema = z
+  .object({
+    name: z.string().trim().max(200, "Name is too long"),
+    description: z.string().trim().max(3000, "Description is too long"),
+    previewUrl: z.string().trim().refine((v) => v === "" || isUrl(v), {
+      message: "Preview URL must be a valid URL",
+    }).nullable(),
+    sourceCodeUrl: z.string().trim().refine((v) => v === "" || isUrl(v), {
+      message: "Source code URL must be a valid URL",
+    }).nullable(),
+    tech: z.array(z.string().trim().max(100)),
+  })
+  .transform((p) => ({
+    name: p.name,
+    description: p.description,
+    previewUrl: p.previewUrl || null,
+    sourceCodeUrl: p.sourceCodeUrl || null,
+    tech: p.tech.filter(Boolean),
+  }));
+
 export const profileExperienceSchema = z
   .object({
     role: z.string().trim().max(200, "Role is too long"),
     company: z.string().trim().max(200, "Company is too long"),
-    location: z.string().trim().max(200, "Location is too long"),
-    startDate: z.string().trim().max(50),
-    endDate: z.string().trim().max(50),
-    summary: z.string().trim().max(2000),
+    location: z.string().trim().max(200, "Location is too long").nullable(),
+    startDate: z.string().trim().max(50).nullable(),
+    endDate: z.string().trim().max(50).nullable(),
+    summary: z.string().trim().max(2000).nullable(),
     bullets: z.array(z.string().trim().max(500)),
+    projects: z.array(profileProjectSchema),
   })
   .transform((e) => ({
     role: e.role,
@@ -44,16 +66,17 @@ export const profileExperienceSchema = z
     endDate: e.endDate || null,
     summary: e.summary || null,
     bullets: e.bullets.filter(Boolean),
+    projects: e.projects.filter((p) => p.name),
   }));
 
 export const profileEducationSchema = z
   .object({
     school: z.string().trim().max(200, "School is too long"),
     degree: z.string().trim().max(200, "Degree is too long"),
-    field: z.string().trim().max(200),
-    startYear: z.string().trim().max(20),
-    endYear: z.string().trim().max(20),
-    notes: z.string().trim().max(2000),
+    field: z.string().trim().max(200).nullable(),
+    startYear: z.string().trim().max(20).nullable(),
+    endYear: z.string().trim().max(20).nullable(),
+    notes: z.string().trim().max(2000).nullable(),
   })
   .transform((e) => ({
     school: e.school,
@@ -64,22 +87,6 @@ export const profileEducationSchema = z
     notes: e.notes || null,
   }));
 
-export const profileProjectSchema = z
-  .object({
-    name: z.string().trim().max(200, "Name is too long"),
-    description: z.string().trim().max(3000, "Description is too long"),
-    link: z.string().trim().refine((v) => v === "" || isUrl(v), {
-      message: "Link must be a valid URL",
-    }),
-    tech: z.array(z.string().trim().max(100)),
-  })
-  .transform((p) => ({
-    name: p.name,
-    description: p.description,
-    link: p.link || null,
-    tech: p.tech.filter(Boolean),
-  }));
-
 export const profileSkillsSchema = z.array(z.string().trim().max(100));
 
 export const profileUpdateSchema = z
@@ -87,11 +94,11 @@ export const profileUpdateSchema = z
     name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
     email: z.string().trim().refine((v) => v === "" || isEmail(v), {
       message: "Email must be valid",
-    }),
-    headline: z.string().trim().max(300),
-    phone: z.string().trim().max(100),
-    location: z.string().trim().max(200),
-    summary: z.string().trim().max(5000),
+    }).nullable(),
+    headline: z.string().trim().max(300).nullable(),
+    phone: z.string().trim().max(100).nullable(),
+    location: z.string().trim().max(200).nullable(),
+    summary: z.string().trim().max(5000).nullable(),
     skills: profileSkillsSchema,
     experience: z.array(profileExperienceSchema),
     education: z.array(profileEducationSchema),
@@ -199,7 +206,8 @@ export const applications = pgTable(
     baseResumeId: uuid("base_resume_id").references(() => resumes.id, {
       onDelete: "set null",
     }),
-    mailSearchQuery: text("mail_search_query"),
+    mailKeywords: text("mail_keywords").array(),
+    mailExclusions: text("mail_exclusions").array(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -285,8 +293,12 @@ export const emails = pgTable(
     subject: text("subject"),
     fromEmail: text("from_email"),
     toEmail: text("to_email"),
+    senderEmail: text("sender_email"),
     snippet: text("snippet"),
     bodyText: text("body_text"),
+    relevanceScore: integer("relevance_score"),
+    matchReasons: text("match_reasons").array(),
+    isHidden: boolean("is_hidden").default(false).notNull(),
     internalDate: timestamp("internal_date"),
     isRead: boolean("is_read").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -294,7 +306,7 @@ export const emails = pgTable(
   },
   (d) => [
     index("emails_application_id_idx").on(d.applicationId),
-    uniqueIndex("emails_gmail_message_id_idx").on(d.gmailMessageId),
+    uniqueIndex("emails_gmail_account_message_idx").on(d.gmailAccountId, d.gmailMessageId),
   ]
 );
 

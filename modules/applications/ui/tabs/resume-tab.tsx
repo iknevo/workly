@@ -2,18 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Select,
@@ -22,7 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 
 import { ResumeCodeViewer } from "@/modules/resumes/ui/resume-code-viewer";
@@ -42,6 +43,10 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
   );
 
   const resumes = resumesQuery.data ?? [];
+  const formattedResumes = resumes.map((c) => ({
+    value: c.id,
+    label: c.title,
+  }));
   const applicationResumes = applicationResumesQuery.data ?? [];
 
   const profile = profileQuery.data;
@@ -107,15 +112,16 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
               <Select
                 value={selectedBaseResume || "none"}
                 onValueChange={(v) => setSelectedBaseResume(v === "none" ? "" : (v ?? ""))}
+                items={formattedResumes}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="None (use my profile)" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false}>
                   <SelectItem value="none">None</SelectItem>
-                  {resumes.map((resume) => (
-                    <SelectItem key={resume.id} value={resume.id}>
-                      {resume.title}
+                  {formattedResumes.map((resume) => (
+                    <SelectItem key={resume.value} value={resume.value}>
+                      {resume.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -228,17 +234,95 @@ function ResumeViewerDialog({
         <SheetHeader>
           <SheetTitle>Tailored resume</SheetTitle>
           <SheetDescription>
-            Generated {resume?.createdAt?.toLocaleString() ?? ""} · view or copy the LaTeX source.
+            Generated {resume?.createdAt?.toLocaleString() ?? ""} · PDF preview or LaTeX source.
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">
           {resumeQuery.isLoading ? (
             <Skeleton className="h-96 w-full" />
           ) : resume ? (
-            <ResumeCodeViewer content={resume.content} />
+            <Tabs defaultValue="preview" className="gap-3">
+              <TabsList variant="line">
+                <TabsTrigger value="preview">PDF preview</TabsTrigger>
+                <TabsTrigger value="source">LaTeX source</TabsTrigger>
+              </TabsList>
+              <TabsContent value="preview">
+                <ResumePdfPreview key={resume.id} content={resume.content} />
+              </TabsContent>
+              <TabsContent value="source">
+                <ResumeCodeViewer content={resume.content} />
+              </TabsContent>
+            </Tabs>
           ) : null}
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ResumePdfPreview({ content }: { content: string }) {
+  const trpc = useTRPC();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const urlRef = useRef<string | null>(null);
+
+  const compile = useMutation(trpc.resumes.compile.mutationOptions());
+
+  useEffect(() => {
+    if (!content.trim()) return;
+    compile.mutate({ content }, {
+      onSuccess: (result) => {
+        const bytes = Uint8Array.from(atob(result.pdfBase64), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+        urlRef.current = url;
+        setPreviewUrl(url);
+        setError(null);
+      },
+      onError: (compileError) => {
+        setError(compileError.message.slice(0, 300));
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content]);
+
+  useEffect(() => {
+    return () => {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    };
+  }, []);
+
+  if (compile.isPending) {
+    return (
+      <div className="flex h-[calc(100vh-16rem)] items-center justify-center rounded-lg border bg-white text-sm text-muted-foreground">
+        <span className="flex items-center gap-2">
+          <Loader2 className="size-4 animate-spin" />
+          Compiling PDF…
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="max-h-64 overflow-auto rounded-lg bg-destructive/10 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-destructive">
+          {error}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Couldn&apos;t compile a PDF preview. Switch to the LaTeX source tab to view the code.
+        </p>
+      </div>
+    );
+  }
+
+  if (!previewUrl) return null;
+
+  return (
+    <iframe
+      src={previewUrl}
+      className="h-[calc(100vh-16rem)] w-full rounded-lg border bg-white"
+      title="PDF preview"
+    />
   );
 }

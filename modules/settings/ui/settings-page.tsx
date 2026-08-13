@@ -64,9 +64,7 @@ export function SettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Your profile and connected accounts.
-        </p>
+        <p className="text-sm text-muted-foreground">Your profile and connected accounts.</p>
       </div>
 
       <Card>
@@ -108,7 +106,7 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>Gmail</CardTitle>
           <CardDescription>
-            Connect a Gmail account so recruiter emails auto-sync to each application.
+            Connect one or more Gmail accounts so recruiter emails auto-sync to each application.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -140,7 +138,7 @@ export function SettingsPage() {
 
           <div className="flex items-center justify-between gap-4 border-t pt-4">
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Recruiter email tracking</span>
+              <span className="text-sm font-medium">Email tracking</span>
               <span className="text-xs text-muted-foreground">
                 {configured
                   ? "Read-only Gmail access to match emails to each application."
@@ -149,12 +147,12 @@ export function SettingsPage() {
             </div>
             {!configured ? (
               <Badge className="bg-muted text-muted-foreground">Unconfigured</Badge>
-            ) : accounts.length === 0 ? (
+            ) : (
               <Button onClick={() => getAuthUrl.mutate()} disabled={getAuthUrl.isPending}>
                 <Plus />
-                Connect Gmail
+                {accounts.length === 0 ? "Connect Gmail" : "Add Gmail account"}
               </Button>
-            ) : null}
+            )}
           </div>
         </CardContent>
       </Card>

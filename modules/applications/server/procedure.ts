@@ -2,6 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { generateTailoredResume } from "@/lib/ai";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { buildResumeLatex, hasResumeData } from "@/lib/resume";
+
 import { db } from "@/db";
 import {
   applicationResumes,
@@ -11,9 +15,6 @@ import {
   resumes,
   updateApplicationSchema,
 } from "@/db/schema";
-import { generateTailoredResume } from "@/lib/ai";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { buildResumeLatex, hasResumeData } from "@/lib/resume";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const applicationsRouter = createTRPCRouter({
@@ -101,15 +102,15 @@ export const applicationsRouter = createTRPCRouter({
           userId: user.id,
           company: input.company,
           position: input.position,
-          location: input.location ?? null,
-          url: input.url ?? null,
+          location: input.location || null,
+          url: input.url || null,
           status: input.status ?? "draft",
-          salary: input.salary ?? null,
-          appliedAt: input.appliedAt ?? null,
-          jobDescription: input.jobDescription ?? null,
-          notes: input.notes ?? null,
-          baseResumeId: input.baseResumeId ?? null,
-          mailSearchQuery: input.mailSearchQuery ?? null,
+          salary: input.salary || null,
+          appliedAt: input.appliedAt || null,
+          jobDescription: input.jobDescription || null,
+          notes: input.notes || null,
+          baseResumeId: input.baseResumeId || null,
+          mailKeywords: (input.mailKeywords as string[] | undefined) ?? [],
         })
         .returning();
 
@@ -121,22 +122,40 @@ export const applicationsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { user } = ctx;
 
+      const set: {
+        company?: string;
+        position?: string;
+        location?: string | null;
+        url?: string | null;
+        status?: typeof applications.$inferSelect.status;
+        salary?: string | null;
+        appliedAt?: Date | null;
+        jobDescription?: string | null;
+        notes?: string | null;
+        baseResumeId?: string | null;
+        mailKeywords?: string[];
+        updatedAt: Date;
+      } = {
+        company: input.company,
+        position: input.position,
+        location: input.location || null,
+        url: input.url || null,
+        status: input.status,
+        salary: input.salary || null,
+        appliedAt: input.appliedAt || null,
+        jobDescription: input.jobDescription || null,
+        notes: input.notes || null,
+        baseResumeId: input.baseResumeId || null,
+        updatedAt: new Date(),
+      };
+
+      if (input.mailKeywords !== undefined) {
+        set.mailKeywords = (input.mailKeywords as string[] | undefined) ?? [];
+      }
+
       const [updated] = await db
         .update(applications)
-        .set({
-          company: input.company,
-          position: input.position,
-          location: input.location,
-          url: input.url,
-          status: input.status,
-          salary: input.salary,
-          appliedAt: input.appliedAt,
-          jobDescription: input.jobDescription,
-          notes: input.notes,
-          baseResumeId: input.baseResumeId,
-          mailSearchQuery: input.mailSearchQuery,
-          updatedAt: new Date(),
-        })
+        .set(set)
         .where(and(eq(applications.id, input.id), eq(applications.userId, user.id)))
         .returning();
 
@@ -202,7 +221,8 @@ export const applicationsRouter = createTRPCRouter({
         if (!hasResumeData(user)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Your profile needs some content first. Add your experience, skills, or projects on the Profile page.",
+            message:
+              "Your profile needs some content first. Add your experience, skills, or projects on the Profile page.",
           });
         }
         baseContent = buildResumeLatex(user);

@@ -1,66 +1,80 @@
 "use client";
 
+import { Controller } from "react-hook-form";
+import type { Control } from "react-hook-form";
+
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { ProfileFormInput } from "@/db/schema";
 
-import { Field } from "../editors";
-
-export function BasicsTab({
-  draft,
-  set,
-}: {
-  draft: ProfileFormInput;
-  set: <K extends keyof ProfileFormInput>(key: K, value: ProfileFormInput[K]) => void;
-}) {
+export function BasicsTab({ control }: { control: Control<ProfileFormInput> }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Full name">
-        <Input
-          value={draft.name}
-          onChange={(e) => set("name", e.target.value)}
-          placeholder="Ahmed Abdelhafiez"
-        />
-      </Field>
-      <Field label="Email">
-        <Input
-          type="email"
-          value={draft.email}
-          onChange={(e) => set("email", e.target.value)}
-          placeholder="you@example.com"
-        />
-      </Field>
-      <Field label="Headline">
-        <Input
-          value={draft.headline}
-          onChange={(e) => set("headline", e.target.value)}
-          placeholder="Senior Software Engineer, 8 years experience"
-        />
-      </Field>
-      <Field label="Phone">
-        <Input
-          value={draft.phone}
-          onChange={(e) => set("phone", e.target.value)}
-          placeholder="+1 (555) 000-0000"
-        />
-      </Field>
-      <Field label="Location">
-        <Input
-          value={draft.location}
-          onChange={(e) => set("location", e.target.value)}
-          placeholder="Remote / New York, NY"
-        />
-      </Field>
+      <Controller
+        name="name"
+        control={control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel>Full name</FieldLabel>
+            <Input {...field} placeholder="Ahmed Abdelhafiez" />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+      <Controller
+        name="email"
+        control={control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel>Email</FieldLabel>
+            <Input {...field} type="email" value={field.value ?? ""} placeholder="you@example.com" />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+      <Controller
+        name="headline"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>Headline</FieldLabel>
+            <Input {...field} value={field.value ?? ""} placeholder="Senior Software Engineer, 8 years experience" />
+          </Field>
+        )}
+      />
+      <Controller
+        name="phone"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>Phone</FieldLabel>
+            <Input {...field} value={field.value ?? ""} placeholder="+1 (555) 000-0000" />
+          </Field>
+        )}
+      />
+      <Controller
+        name="location"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>Location</FieldLabel>
+            <Input {...field} value={field.value ?? ""} placeholder="Remote / New York, NY" />
+          </Field>
+        )}
+      />
       <div className="sm:col-span-2">
-        <Field label="Summary">
-          <Textarea
-            value={draft.summary}
-            onChange={(e) => set("summary", e.target.value)}
-            placeholder="Short professional summary that opens your resume."
-            rows={4}
-          />
-        </Field>
+        <Controller
+          name="summary"
+          control={control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel>Summary</FieldLabel>
+              <Textarea {...field} value={field.value ?? ""} placeholder="Short professional summary that opens your resume." rows={4} />
+            </Field>
+          )}
+        />
       </div>
     </div>
   );

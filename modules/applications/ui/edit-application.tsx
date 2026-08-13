@@ -62,7 +62,7 @@ export function EditApplication({ applicationId }: { applicationId: string }) {
           ) : (
             <ApplicationForm
               initial={application}
-              onSubmit={(data) => update.mutate({ id: applicationId, ...(data as object) })}
+              onSubmit={(data) => update.mutate({ id: applicationId, ...data })}
               submitLabel="Save changes"
               submitting={update.isPending}
             />

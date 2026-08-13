@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { CalendarIcon, Loader2 } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -17,17 +22,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 
-import { cn } from "@/lib/utils";
-
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
+import { insertEventSchema } from "@/db/schema";
 import { EVENT_TYPE_CONFIG } from "@/modules/applications/constants";
+import { useTRPC } from "@/trpc/client";
 
-import { format } from "date-fns";
-import { CalendarIcon, Loader2 } from "lucide-react";
-
-type EventType = keyof typeof EVENT_TYPE_CONFIG;
+const eventFormSchema = insertEventSchema.omit({ userId: true });
+type EventFormValues = z.infer<typeof eventFormSchema>;
 
 export function EventFormDialog({
   applicationId,
@@ -39,16 +39,21 @@ export function EventFormDialog({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [type, setType] = useState<EventType>("interview");
-  const [dateTime, setDateTime] = useState<Date | undefined>(undefined);
-  const [linkedApplicationId, setLinkedApplicationId] = useState<string | undefined>(
-    applicationId
-  );
-
   const applicationsQuery = useQuery(trpc.applications.getMany.queryOptions());
   const applications = applicationsQuery.data ?? [];
+
+  const form = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      type: "interview",
+      startTime: undefined,
+      applicationId: applicationId ?? null,
+    },
+  });
+
+  const [title, startTime] = form.watch(["title", "startTime"]);
 
   const create = useMutation(
     trpc.events.create.mutationOptions({
@@ -67,118 +72,158 @@ export function EventFormDialog({
     })
   );
 
-  const canSubmit = title.trim().length > 0 && dateTime !== undefined;
+  const typeItems = Object.entries(EVENT_TYPE_CONFIG).map(([value, config]) => ({
+    value,
+    label: config.label,
+  }));
+  const applicationItems = applications.map((app) => ({
+    value: app.id,
+    label: `${app.company} — ${app.position}`,
+  }));
+
+  const onSubmit = (values: EventFormValues) => create.mutate(values);
 
   return (
-    <div className="flex flex-col gap-4">
+    <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
       {!applicationId && (
-        <div className="flex flex-col gap-2">
-          <Label>Link to application</Label>
-          <Select
-            value={linkedApplicationId ?? "none"}
-            onValueChange={(v) => setLinkedApplicationId(v === "none" ? undefined : (v ?? undefined))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="No application" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No application</SelectItem>
-              {applications.map((app) => (
-                <SelectItem key={app.id} value={app.id}>
-                  {app.company} — {app.position}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Controller
+          name="applicationId"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel>Link to application</FieldLabel>
+              <Select
+                name={field.name}
+                value={field.value ?? "none"}
+                onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                items={applicationItems}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No application" />
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  <SelectItem value="none">No application</SelectItem>
+                  {applicationItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
       )}
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="event-title">Title</Label>
-        <Input
-          id="event-title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Phone screen with recruiter"
-        />
-      </div>
+      <Controller
+        name="title"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor="event-title">Title</FieldLabel>
+            <Input {...field} id="event-title" placeholder="Phone screen with recruiter" />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
-      <div className="flex flex-col gap-2">
-        <Label>Type</Label>
-        <Select value={type} onValueChange={(v) => setType((v ?? "interview") as EventType)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(EVENT_TYPE_CONFIG).map(([value, config]) => (
-              <SelectItem key={value} value={value}>
-                {config.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Controller
+        name="type"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel>Type</FieldLabel>
+            <Select
+              name={field.name}
+              value={field.value ?? "other"}
+              onValueChange={field.onChange}
+              items={typeItems}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a type" />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                {typeItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
-      <div className="flex flex-col gap-2">
-        <Label>Date and time</Label>
-        <Popover>
-          <PopoverTrigger render={<Button variant="outline" className="justify-start text-left font-normal" />}>
-            <CalendarIcon className="mr-2 size-4" />
-            {dateTime ? (
-              format(dateTime, "PPP 'at' p")
-            ) : (
-              <span className="text-muted-foreground">Pick a date and time</span>
-            )}
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={dateTime}
-              onSelect={(date) => {
-                if (date) {
-                  const now = new Date();
-                  date.setHours(now.getHours(), now.getMinutes(), 0, 0);
-                  setDateTime(date);
+      <Controller
+        name="startTime"
+        control={form.control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>Date and time</FieldLabel>
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  />
                 }
-              }}
-              autoFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+              >
+                <CalendarIcon className="mr-2 size-4" />
+                {field.value ? (
+                  format(field.value, "PPP 'at' p")
+                ) : (
+                  <span className="text-muted-foreground">Pick a date and time</span>
+                )}
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={field.value ?? undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      const now = new Date();
+                      date.setHours(now.getHours(), now.getMinutes(), 0, 0);
+                      field.onChange(date);
+                    }
+                  }}
+                  autoFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </Field>
+        )}
+      />
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="event-description">Description</Label>
-        <Textarea
-          id="event-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Zoom link, interviewer name..."
-          rows={3}
-        />
-      </div>
+      <Controller
+        name="description"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor="event-description">Description</FieldLabel>
+            <Textarea
+              {...field}
+              id="event-description"
+              value={field.value ?? ""}
+              placeholder="Zoom link, interviewer name..."
+              rows={3}
+            />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onClose}>
+        <Button variant="ghost" type="button" onClick={onClose}>
           Cancel
         </Button>
-        <Button
-          onClick={() =>
-            dateTime &&
-            create.mutate({
-              title,
-              description: description || null,
-              type,
-              startTime: dateTime,
-              applicationId: linkedApplicationId ?? null,
-            })
-          }
-          disabled={create.isPending || !canSubmit}
-        >
+        <Button type="submit" disabled={create.isPending || !title.trim() || !startTime}>
           {create.isPending && <Loader2 className="animate-spin" />}
           Add event
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

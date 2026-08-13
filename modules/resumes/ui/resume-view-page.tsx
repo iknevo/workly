@@ -1,5 +1,10 @@
 "use client";
 
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Eye, Loader2, Pencil } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,14 +18,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery } from "@tanstack/react-query";
-
 import { ResumeCodeViewer } from "./resume-code-viewer";
-
-import Link from "next/link";
-import { ArrowLeft, Eye, Loader2, Pencil } from "lucide-react";
-import { useState } from "react";
+import { useTRPC } from "@/trpc/client";
 
 export function ResumeViewPage({ resumeId }: { resumeId: string }) {
   const trpc = useTRPC();
@@ -59,9 +58,7 @@ export function ResumeViewPage({ resumeId }: { resumeId: string }) {
             <ArrowLeft />
           </Link>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {resume?.title ?? "Resume"}
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{resume?.title ?? "Resume"}</h1>
             <p className="text-sm text-muted-foreground">LaTeX source for this base resume.</p>
           </div>
         </div>

@@ -1,28 +1,21 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { cn } from "@/lib/utils";
-
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-
-import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
 import type { applicationStatus } from "@/db/schema";
-import { useUser } from "@clerk/nextjs";
+import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
+import { useTRPC } from "@/trpc/client";
 
 type Status = (typeof applicationStatus.enumValues)[number];
 
@@ -131,7 +124,7 @@ export function Dashboard() {
                     <Link
                       key={app.id}
                       href={`/applications/${app.id}`}
-                      className="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-muted/50"
+                      className="flex items-center justify-between gap-3 py-3"
                     >
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-medium">{app.position}</span>
@@ -140,9 +133,7 @@ export function Dashboard() {
                           {app.location ? ` · ${app.location}` : ""}
                         </span>
                       </div>
-                      <Badge className={cn(config.className)}>
-                        {config.label}
-                      </Badge>
+                      <Badge className={cn(config.className)}>{config.label}</Badge>
                     </Link>
                   );
                 })}
@@ -167,10 +158,10 @@ export function Dashboard() {
                   {upcomingEvents.map((event) => (
                     <div key={event.id} className="flex items-center gap-3 py-2.5">
                       <div className="flex size-10 shrink-0 flex-col items-center justify-center rounded-md border bg-muted/50">
-                        <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase">
                           {event.startTime.toLocaleDateString(undefined, { month: "short" })}
                         </span>
-                        <span className="text-sm font-semibold leading-none">
+                        <span className="text-sm leading-none font-semibold">
                           {event.startTime.getDate()}
                         </span>
                       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Briefcase,
   FolderGit2,
@@ -9,13 +10,15 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import type { ProfileFormInput, UserProfile } from "@/db/schema";
+import { profileUpdateSchema } from "@/db/schema";
+import type { ProfileFormInput, ProfileProject, UserProfile } from "@/db/schema";
 
 import { BasicsTab } from "./tabs/basics-tab";
 import { EducationTab } from "./tabs/education-tab";
@@ -23,6 +26,14 @@ import { ExperienceTab } from "./tabs/experience-tab";
 import { LinksTab } from "./tabs/links-tab";
 import { ProjectsTab } from "./tabs/projects-tab";
 import { SkillsTab } from "./tabs/skills-tab";
+
+const toProjectInput = (p: ProfileProject): ProfileFormInput["projects"][number] => ({
+  name: p.name,
+  description: p.description,
+  previewUrl: p.previewUrl ?? (p as { link?: string | null }).link ?? "",
+  sourceCodeUrl: p.sourceCodeUrl ?? "",
+  tech: p.tech,
+});
 
 const toForm = (profile: UserProfile): ProfileFormInput => ({
   name: profile.name,
@@ -40,6 +51,7 @@ const toForm = (profile: UserProfile): ProfileFormInput => ({
     endDate: e.endDate ?? "",
     summary: e.summary ?? "",
     bullets: e.bullets,
+    projects: (e.projects ?? []).map(toProjectInput),
   })),
   education: profile.education.map((e) => ({
     school: e.school,
@@ -49,12 +61,7 @@ const toForm = (profile: UserProfile): ProfileFormInput => ({
     endYear: e.endYear ?? "",
     notes: e.notes ?? "",
   })),
-  projects: profile.projects.map((p) => ({
-    name: p.name,
-    description: p.description,
-    link: p.link ?? "",
-    tech: p.tech,
-  })),
+  projects: profile.projects.map(toProjectInput),
   links: profile.links.map((l) => ({ label: l.label, url: l.url })),
 });
 
@@ -67,13 +74,15 @@ export function ProfileForm({
   onSave: (draft: ProfileFormInput) => void;
   submitting: boolean;
 }) {
-  const [draft, setDraft] = useState<ProfileFormInput>(() => toForm(profile));
+  const form = useForm<ProfileFormInput>({
+    resolver: zodResolver(profileUpdateSchema) as Resolver<ProfileFormInput>,
+    defaultValues: toForm(profile),
+  });
 
-  const set = <K extends keyof ProfileFormInput>(key: K, value: ProfileFormInput[K]) =>
-    setDraft((prev) => ({ ...prev, [key]: value }));
+  const name = form.watch("name");
 
   return (
-    <div className="flex flex-col gap-6">
+    <form className="flex flex-col gap-6" onSubmit={form.handleSubmit((values) => onSave(values))}>
       <Tabs defaultValue="basics" className="w-full">
         <TabsList className="w-full flex-wrap sm:w-fit">
           <TabsTrigger value="basics">
@@ -103,47 +112,38 @@ export function ProfileForm({
         </TabsList>
 
         <TabsContent value="basics" className="pt-4">
-          <BasicsTab draft={draft} set={set} />
+          <BasicsTab control={form.control} />
         </TabsContent>
 
         <TabsContent value="skills" className="pt-4">
-          <SkillsTab skills={draft.skills} onChange={(skills) => set("skills", skills)} />
+          <SkillsTab control={form.control} />
         </TabsContent>
 
         <TabsContent value="experience" className="pt-4">
-          <ExperienceTab
-            items={draft.experience}
-            onChange={(experience) => set("experience", experience)}
-          />
+          <ExperienceTab control={form.control} />
         </TabsContent>
 
         <TabsContent value="education" className="pt-4">
-          <EducationTab
-            items={draft.education}
-            onChange={(education) => set("education", education)}
-          />
+          <EducationTab control={form.control} />
         </TabsContent>
 
         <TabsContent value="projects" className="pt-4">
-          <ProjectsTab items={draft.projects} onChange={(projects) => set("projects", projects)} />
+          <ProjectsTab control={form.control} />
         </TabsContent>
 
         <TabsContent value="links" className="pt-4">
-          <LinksTab items={draft.links} onChange={(links) => set("links", links)} />
+          <LinksTab control={form.control} />
         </TabsContent>
       </Tabs>
 
       <Separator />
 
       <div className="flex items-center justify-end">
-        <Button
-          onClick={() => onSave(draft)}
-          disabled={submitting || !draft.name.trim()}
-        >
+        <Button type="submit" disabled={submitting || !name.trim()}>
           {submitting && <Loader2 className="animate-spin" />}
           Save profile
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

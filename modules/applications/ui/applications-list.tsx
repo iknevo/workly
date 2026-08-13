@@ -37,8 +37,8 @@ export function ApplicationsList() {
       const query = search.trim().toLowerCase();
       const matchesSearch =
         query.length === 0 ||
-        app.company.toLowerCase().includes(query) ||
-        app.position.toLowerCase().includes(query) ||
+        (app.company ?? "").toLowerCase().includes(query) ||
+        (app.position ?? "").toLowerCase().includes(query) ||
         (app.location ?? "").toLowerCase().includes(query);
       return matchesFilter && matchesSearch;
     });

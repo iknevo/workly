@@ -1,85 +1,65 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { useFieldArray } from "react-hook-form";
+import type { Control } from "react-hook-form";
+import { Plus } from "lucide-react";
 
-import type { ProfileProjectInput } from "@/db/schema";
+import { Button } from "@/components/ui/button";
 
-import { Field, SectionCard, SectionList, TagsEditor } from "../editors";
+import type { ProfileFormInput, ProfileProjectInput } from "@/db/schema";
+
+import { ProjectFields, SectionCard } from "../editors";
 
 const emptyProject = (): ProfileProjectInput => ({
   name: "",
   description: "",
-  link: "",
+  previewUrl: "",
+  sourceCodeUrl: "",
   tech: [],
 });
 
-export function ProjectsTab({
-  items,
-  onChange,
-}: {
-  items: ProfileProjectInput[];
-  onChange: (next: ProfileProjectInput[]) => void;
-}) {
+export function ProjectsTab({ control }: { control: Control<ProfileFormInput> }) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "projects",
+  });
+
   return (
-    <SectionList
-      items={items}
-      onChange={onChange}
-      onAdd={() => onChange([...items, emptyProject()])}
-      addLabel="Add project"
-      emptyText="No projects yet."
-      renderItem={(item, onChangeItem, onRemove, index) => (
-        <ProjectEntry item={item} onChange={onChangeItem} onRemove={onRemove} index={index} />
+    <div className="flex flex-col gap-4">
+      {fields.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">No projects yet.</p>
+      ) : (
+        fields.map((field, index) => (
+          <ProjectEntry
+            key={field.id}
+            index={index}
+            control={control}
+            onRemove={() => remove(index)}
+          />
+        ))
       )}
-    />
+      <div>
+        <Button variant="outline" size="sm" onClick={() => append(emptyProject())}>
+          <Plus />
+          Add project
+        </Button>
+      </div>
+    </div>
   );
 }
 
 function ProjectEntry({
-  item,
-  onChange,
-  onRemove,
   index,
+  control,
+  onRemove,
 }: {
-  item: ProfileProjectInput;
-  onChange: (next: ProfileProjectInput) => void;
-  onRemove: () => void;
   index: number;
+  control: Control<ProfileFormInput>;
+  onRemove: () => void;
 }) {
   return (
     <SectionCard index={index} onRemove={onRemove}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name">
-          <Input
-            value={item.name}
-            onChange={(e) => onChange({ ...item, name: e.target.value })}
-            placeholder="Workly"
-          />
-        </Field>
-        <Field label="Link">
-          <Input
-            value={item.link}
-            onChange={(e) => onChange({ ...item, link: e.target.value })}
-            placeholder="https://..."
-          />
-        </Field>
-      </div>
-      <Field label="Description">
-        <Textarea
-          value={item.description}
-          onChange={(e) => onChange({ ...item, description: e.target.value })}
-          placeholder="What did you build and why does it matter?"
-          rows={3}
-        />
-      </Field>
-      <Field label="Tech">
-        <TagsEditor
-          value={item.tech}
-          onChange={(tech) => onChange({ ...item, tech })}
-          placeholder="e.g. Next.js, tRPC, PostgreSQL"
-          addLabel="Add tech"
-        />
-      </Field>
+      <ProjectFields prefix={`projects.${index}`} control={control} />
     </SectionCard>
   );
 }

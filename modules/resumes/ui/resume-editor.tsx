@@ -1,15 +1,19 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 
+import { insertResumeSchema } from "@/db/schema";
 import { useTRPC } from "@/trpc/client";
 
 const STARTER_TEMPLATE = `\\documentclass[11pt,a4paper]{article}
@@ -65,6 +69,9 @@ const COMPILE_DEBOUNCE_MS = 600;
 
 type CompileStatus = "idle" | "compiling" | "success" | "error";
 
+const resumeFormSchema = insertResumeSchema.omit({ userId: true });
+type ResumeFormValues = z.infer<typeof resumeFormSchema>;
+
 export function ResumeEditor({
   resume,
   onDone,
@@ -75,8 +82,16 @@ export function ResumeEditor({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState(resume?.title ?? "");
-  const [content, setContent] = useState(resume?.content ?? STARTER_TEMPLATE);
+  const form = useForm<ResumeFormValues>({
+    resolver: zodResolver(resumeFormSchema),
+    defaultValues: {
+      title: resume?.title ?? "",
+      content: resume?.content ?? STARTER_TEMPLATE,
+    },
+  });
+
+  const title = form.watch("title");
+  const content = form.watch("content");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<CompileStatus>("idle");
   const [compileError, setCompileError] = useState<string | null>(null);
@@ -163,36 +178,52 @@ export function ResumeEditor({
   const pending = update.isPending || create.isPending;
   const valid = title.trim().length > 0 && content.trim().length > 0;
 
+  const onSubmit = (values: ResumeFormValues) => {
+    if (resume) update.mutate({ id: resume.id, ...values });
+    else create.mutate(values);
+  };
+
   return (
-    <div className="flex flex-col gap-4">
+    <form id="resume-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="resume-title">Title</Label>
-            <Input
-              id="resume-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="General / Software Engineer"
-            />
-          </div>
+          <Controller
+            name="title"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="resume-title">Title</FieldLabel>
+                <Input {...field} id="resume-title" placeholder="General / Software Engineer" />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
           <div className="flex items-center justify-between">
-            <Label htmlFor="resume-content">LaTeX source</Label>
+            <FieldLabel htmlFor="resume-content">LaTeX source</FieldLabel>
             <span className="text-xs text-muted-foreground">
               {content.length.toLocaleString()} chars
             </span>
           </div>
-          <Textarea
-            id="resume-content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="h-[420px] min-h-[420px] resize-none font-mono text-xs leading-relaxed lg:h-[calc(100vh-260px)]"
+          <Controller
+            name="content"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <Textarea
+                  {...field}
+                  id="resume-content"
+                  value={field.value}
+                  className="h-[420px] min-h-[420px] resize-none font-mono text-xs leading-relaxed lg:h-[calc(100vh-260px)]"
+                />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
           />
         </div>
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="pdf-preview">PDF preview</Label>
+            <FieldLabel htmlFor="pdf-preview">PDF preview</FieldLabel>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {status === "compiling" && (
                 <>
@@ -227,6 +258,7 @@ export function ResumeEditor({
 
       <div className="flex justify-end gap-2">
         <Button
+          type="button"
           variant="outline"
           onClick={() => compileTex(content)}
           disabled={compile.isPending || !content.trim()}
@@ -234,18 +266,11 @@ export function ResumeEditor({
           {compile.isPending && <Loader2 className="animate-spin" />}
           Recompile
         </Button>
-        <Button
-          onClick={() =>
-            resume
-              ? update.mutate({ id: resume.id, title, content })
-              : create.mutate({ title, content })
-          }
-          disabled={pending || !valid}
-        >
+        <Button type="submit" disabled={pending || !valid}>
           {pending && <Loader2 className="animate-spin" />}
           {resume ? "Save changes" : "Create resume"}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
