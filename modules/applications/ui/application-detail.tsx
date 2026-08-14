@@ -38,14 +38,14 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         {applicationQuery.isLoading ? (
           <Skeleton className="h-8 w-72" />
         ) : application ? (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{application.position}</h1>
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">{application.position}</h1>
               <Badge className={cn(APPLICATION_STATUS_CONFIG[application.status].className)}>
                 {APPLICATION_STATUS_CONFIG[application.status].label}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="min-w-0 break-words text-sm text-muted-foreground">
               {application.company}
               {application.location ? ` · ${application.location}` : ""}
               {application.url ? (
