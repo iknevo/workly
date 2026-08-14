@@ -2,12 +2,22 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EyeOff, Loader2, Mail, RefreshCw, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
@@ -21,8 +31,10 @@ type SearchConfig = {
     id: string;
     subject: string | null;
     fromEmail: string | null;
+    toEmail: string | null;
     senderEmail: string | null;
     snippet: string | null;
+    bodyText: string | null;
     internalDate: Date | null;
     relevanceScore: number | null;
     matchReasons: string[] | null;
@@ -30,14 +42,28 @@ type SearchConfig = {
   }>;
 };
 
+type Email = SearchConfig["emails"][number];
+
+function initials(from: string | null): string {
+  if (!from) return "?";
+  const name = from.split("<")[0].trim();
+  const local = from.match(/<([^>]+)>/)?.[1] ?? name;
+  const base = name || local;
+  const parts = base.split(/[\s@.]+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const second = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
+  return (first + second).toUpperCase() || "?";
+}
+
 export function EmailsTab({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
-  const gmailQuery = useQuery(trpc.mail.getAccounts.queryOptions());
+  const accountsQuery = useQuery(trpc.mail.getAccounts.queryOptions());
   const emailsQuery = useQuery(trpc.mail.getForApplication.queryOptions({ applicationId }));
 
-  const accounts = gmailQuery.data ?? [];
+  const accounts = accountsQuery.data ?? [];
   const searchConfig = emailsQuery.data;
   const emails = searchConfig?.emails ?? [];
   const visibleEmails = emails
@@ -63,17 +89,6 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
         : old
     );
   };
-
-  const getAuthUrl = useMutation(
-    trpc.mail.getAuthUrl.mutationOptions({
-      onSuccess: (url) => {
-        window.location.assign(url);
-      },
-      onError: (error) => {
-        toast.add({ type: "error", title: "Gmail not configured", description: error.message });
-      },
-    })
-  );
 
   const sync = useMutation(
     trpc.mail.sync.mutationOptions({
@@ -163,7 +178,7 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
     rematch.mutate({ applicationId });
   };
 
-  if (gmailQuery.isLoading || emailsQuery.isLoading) {
+  if (accountsQuery.isLoading || emailsQuery.isLoading) {
     return <Skeleton className="h-64 w-full" />;
   }
 
@@ -177,15 +192,16 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
         <CardContent className="py-8">
           <Empty>
             <EmptyHeader>
-              <EmptyTitle>Connect your Gmail</EmptyTitle>
+              <EmptyTitle>Connect your email</EmptyTitle>
               <EmptyDescription>
-                Connect a Gmail account to automatically pull emails matching this application.
+                Connect an email account in Settings to automatically pull emails matching this
+                application.
               </EmptyDescription>
             </EmptyHeader>
-            <Button onClick={() => getAuthUrl.mutate()} disabled={getAuthUrl.isPending}>
+            <Link href="/settings" className={buttonVariants()}>
               <Mail />
-              Connect Gmail
-            </Button>
+              Connect email
+            </Link>
           </Empty>
         </CardContent>
       </Card>
@@ -196,11 +212,12 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Emails</h2>
           <p className="text-sm text-muted-foreground">
-            {visibleEmails.length} email{visibleEmails.length === 1 ? "" : "s"} matched to this application.
+            {visibleEmails.length} email{visibleEmails.length === 1 ? "" : "s"} matched to this
+            application.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -236,7 +253,9 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                 {keyword}
               </Badge>
             ))}
-            {updateKeywords.isPending && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+            {updateKeywords.isPending && (
+              <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+            )}
           </div>
           <TagsEditor
             value={searchConfig?.keywords ?? []}
@@ -264,47 +283,52 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-col divide-y rounded-lg border bg-card">
+        <div className="flex min-w-0 flex-col divide-y overflow-hidden rounded-lg border bg-card">
           {visibleEmails.map((email) => (
-            <div key={email.id} className="flex flex-col gap-1 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium">{email.subject || "(no subject)"}</span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {email.relevanceScore != null && (
-                    <span className="text-xs text-muted-foreground">{email.relevanceScore}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    {email.internalDate?.toLocaleString() ?? ""}
-                  </span>
+            <div
+              key={email.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedEmail(email)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedEmail(email);
+                }
+              }}
+              className="group flex min-w-0 w-full cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                {initials(email.fromEmail)}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium">
+                  {email.subject || "(no subject)"}
                 </span>
-              </div>
-              <span className="text-xs text-muted-foreground">{email.fromEmail}</span>
-              {email.matchReasons && email.matchReasons.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {email.matchReasons.map((reason) => (
-                    <span
-                      key={reason}
-                      className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                    >
-                      {reason}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {email.snippet && (
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{email.snippet}</p>
-              )}
-              <div className="flex justify-end">
+                <span className="truncate text-xs text-muted-foreground">
+                  {email.fromEmail}
+                  {email.internalDate ? ` · ${email.internalDate.toLocaleDateString()}` : ""}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {email.relevanceScore != null && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {email.relevanceScore}
+                  </span>
+                )}
                 <Button
                   variant="ghost"
-                  size="sm"
-                  onClick={() => hideEmail.mutate({ emailId: email.id })}
-                  className="text-muted-foreground"
+                  size="icon-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideEmail.mutate({ emailId: email.id });
+                  }}
+                  title="Hide email"
+                  className="opacity-0 group-hover:opacity-100 max-sm:opacity-100"
                 >
-                  <EyeOff />
-                  Hide
+                  <EyeOff className="size-4" />
                 </Button>
-              </div>
+              </span>
             </div>
           ))}
         </div>
@@ -313,23 +337,42 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
       {hiddenEmails.length > 0 && (
         <Collapsible className="flex flex-col gap-2">
           <CollapsibleTrigger
-            render={
-              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" />
-            }
+            render={<Button variant="ghost" size="sm" className="w-full text-muted-foreground" />}
           >
             Hidden ({hiddenEmails.length})
           </CollapsibleTrigger>
-          <CollapsibleContent className="flex flex-col divide-y rounded-lg border border-dashed bg-muted/30">
+          <CollapsibleContent className="flex flex-col divide-y overflow-hidden rounded-lg border border-dashed bg-muted/30">
             {hiddenEmails.map((email) => (
-              <div key={email.id} className="flex items-center justify-between gap-2 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm">{email.subject || "(no subject)"}</p>
-                  <p className="truncate text-xs text-muted-foreground">{email.fromEmail}</p>
-                </div>
+              <div
+                key={email.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedEmail(email)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedEmail(email);
+                  }
+                }}
+                className="group flex min-w-0 w-full cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                  {initials(email.fromEmail)}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm">{email.subject || "(no subject)"}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {email.fromEmail}
+                    {email.internalDate ? ` · ${email.internalDate.toLocaleDateString()}` : ""}
+                  </span>
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => unhideEmail.mutate({ emailId: email.id })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    unhideEmail.mutate({ emailId: email.id });
+                  }}
                   className="shrink-0 text-muted-foreground"
                 >
                   <Undo2 />
@@ -340,6 +383,137 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
           </CollapsibleContent>
         </Collapsible>
       )}
+
+      <Sheet
+        open={!!selectedEmail}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEmail(null);
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-lg">
+          {selectedEmail && (
+            <EmailDetail
+              email={selectedEmail}
+              applicationId={applicationId}
+              pending={hideEmail.isPending || unhideEmail.isPending}
+              onHide={() => {
+                hideEmail.mutate({ emailId: selectedEmail.id });
+                setSelectedEmail(null);
+              }}
+              onRestore={() => {
+                unhideEmail.mutate({ emailId: selectedEmail.id });
+                setSelectedEmail(null);
+              }}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
+  );
+}
+
+function EmailDetail({
+  email,
+  applicationId,
+  pending,
+  onHide,
+  onRestore,
+}: {
+  email: Email;
+  applicationId: string;
+  pending: boolean;
+  onHide: () => void;
+  onRestore: () => void;
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const getForApplicationKey = trpc.mail.getForApplication.queryKey({ applicationId });
+
+  const bodyQuery = useQuery({
+    ...trpc.mail.getEmail.queryOptions({ emailId: email.id }),
+    enabled: !email.bodyText,
+  });
+
+  useEffect(() => {
+    if (bodyQuery.data?.bodyText && !email.bodyText) {
+      queryClient.setQueryData<SearchConfig>(getForApplicationKey, (old) =>
+        old
+          ? {
+              ...old,
+              emails: old.emails.map((row) =>
+                row.id === email.id ? { ...row, bodyText: bodyQuery.data?.bodyText ?? null } : row
+              ),
+            }
+          : old
+      );
+    }
+  }, [bodyQuery.data, email.id, email.bodyText, getForApplicationKey, queryClient]);
+
+  const body =
+    email.bodyText ??
+    bodyQuery.data?.bodyText ??
+    (bodyQuery.isFetching ? "" : (email.snippet ?? ""));
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="break-words">{email.subject || "(no subject)"}</SheetTitle>
+        <SheetDescription className="break-words">
+          {email.fromEmail}
+          {email.toEmail ? ` → ${email.toEmail}` : ""}
+          {email.internalDate ? ` · ${email.internalDate.toLocaleString()}` : ""}
+        </SheetDescription>
+      </SheetHeader>
+
+      {email.matchReasons && email.matchReasons.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-4">
+          {email.matchReasons.map((reason) => (
+            <span
+              key={reason}
+              className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+            >
+              {reason}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1 overflow-y-auto border-t px-4 py-3">
+        {bodyQuery.isFetching && !email.bodyText ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-4/6" />
+          </div>
+        ) : body ? (
+          <p className="whitespace-pre-wrap break-words text-sm">{body}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {bodyQuery.isError
+              ? "Could not fetch the full email body. Reconnect your account and sync to refresh it."
+              : "This email has no readable body."}
+          </p>
+        )}
+      </div>
+
+      <SheetFooter>
+        {email.isHidden ? (
+          <Button variant="ghost" onClick={onRestore} disabled={pending}>
+            <Undo2 />
+            Restore
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={onHide}
+            disabled={pending}
+            className="text-muted-foreground"
+          >
+            <EyeOff />
+            Hide
+          </Button>
+        )}
+      </SheetFooter>
+    </>
   );
 }

@@ -1,24 +1,79 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Mail, Plus, Trash2, UserRound } from "lucide-react";
+import { ExternalLink, Info, KeyRound, Mail, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { SubmitEventHandler, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
 import { useTRPC } from "@/trpc/client";
 
+const PROVIDER_LABELS: Record<string, string> = {
+  gmail: "Gmail",
+  outlook: "Outlook",
+  yahoo: "Yahoo",
+  icloud: "iCloud",
+  imap: "Custom IMAP",
+};
+
+const PROVIDER_GUIDES: Record<
+  string,
+  { title: string; steps: string[]; url?: string; urlLabel?: string }
+> = {
+  gmail: {
+    title: "Connect Gmail",
+    steps: [
+      "Turn on 2-Step Verification at myaccount.google.com/security.",
+      "Go to myaccount.google.com/apppasswords (you may need to sign in again).",
+      'Under "Select app", pick Mail — or "Other (custom name)" and type Workly.',
+      "Click Generate. Google shows a 16-character code.",
+      "Paste that code into the App password field below.",
+    ],
+    url: "https://myaccount.google.com/apppasswords",
+    urlLabel: "Open Gmail app passwords",
+  },
+  outlook: {
+    title: "Connect Outlook",
+    steps: [
+      "Turn on two-step verification at account.microsoft.com/security (required for app passwords).",
+      "Open App passwords and create a new one, naming it Workly.",
+      "Copy the one-time code Microsoft shows.",
+      "Paste that code into the App password field below.",
+      "Note: app passwords only work for personal accounts — work or school accounts usually disable them.",
+    ],
+    url: "https://account.live.com/proofs/AppPassword",
+    urlLabel: "Open Outlook app passwords",
+  },
+  imap: {
+    title: "Connect Custom IMAP",
+    steps: [
+      "Find your mail provider's IMAP host and port (check their support or help pages).",
+      "If your provider supports app passwords, create one for this account, otherwise your regular password may work.",
+      "Fill in the IMAP host and port in the fields below (993 is the standard TLS port this app uses).",
+      "Paste your app or account password into the App password field.",
+      "If it fails, check that IMAP access is enabled in your provider's settings.",
+    ],
+  },
+};
+
 export function SettingsPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
 
   const accountsQuery = useQuery(trpc.mail.getAccounts.queryOptions());
   const configuredQuery = useQuery(trpc.mail.isConfigured.queryOptions());
@@ -26,23 +81,29 @@ export function SettingsPage() {
   const accounts = accountsQuery.data ?? [];
   const configured = configuredQuery.data?.configured ?? false;
 
-  const gmailError = searchParams.get("gmail") === "error" ? searchParams.get("reason") : null;
-  const gmailSuccess = searchParams.get("gmail") === "success";
+  const [provider, setProvider] = useState("gmail");
+  const [guideProvider, setGuideProvider] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [appPassword, setAppPassword] = useState("");
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("993");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  useEffect(() => {
-    if (gmailSuccess) {
-      toast.add({
-        type: "success",
-        title: "Gmail connected",
-        description: "Email tracking is ready.",
-      });
-    }
-  }, [gmailSuccess]);
+  const activeGuide = guideProvider ?? (PROVIDER_GUIDES[provider] ? provider : "gmail");
+  const guide = PROVIDER_GUIDES[activeGuide];
 
-  const getAuthUrl = useMutation(
-    trpc.mail.getAuthUrl.mutationOptions({
-      onSuccess: (url) => {
-        window.location.assign(url);
+  const connect = useMutation(
+    trpc.mail.connect.mutationOptions({
+      onSuccess: () => {
+        toast.add({
+          type: "success",
+          title: "Email connected",
+          description: "Email tracking is ready.",
+        });
+        setEmail("");
+        setAppPassword("");
+        setProvider("gmail");
+        queryClient.invalidateQueries({ queryKey: trpc.mail.getAccounts.queryKey() });
       },
       onError: (error) =>
         toast.add({ type: "error", title: "Failed to connect", description: error.message }),
@@ -59,6 +120,25 @@ export function SettingsPage() {
         toast.add({ type: "error", title: "Failed to disconnect", description: error.message }),
     })
   );
+
+  const onSubmit: SubmitEventHandler<HTMLFormElement> = (e) => {
+    e.preventDefault();
+    if (!email || !appPassword) return;
+    connect.mutate({
+      provider: provider as "gmail" | "outlook" | "yahoo" | "icloud" | "imap",
+      email,
+      appPassword,
+      host: provider === "imap" ? host : undefined,
+      port: provider === "imap" && port ? Number(port) : undefined,
+    });
+  };
+
+  const appPasswordUrl =
+    provider === "gmail"
+      ? "https://myaccount.google.com/apppasswords"
+      : provider === "outlook"
+        ? "https://account.microsoft.com/security/password/app-password"
+        : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -85,35 +165,18 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {gmailError ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertTitle>Gmail connection failed</AlertTitle>
-          <AlertDescription className="break-all">
-            {gmailError || "Unknown error"}{" "}
-            <span className="text-muted-foreground">
-              — make sure the exact redirect URI
-              <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">
-                /api/gmail/callback
-              </code>
-              is registered in Google Cloud Console.
-            </span>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       <Card>
         <CardHeader>
-          <CardTitle>Gmail</CardTitle>
+          <CardTitle>Email</CardTitle>
           <CardDescription>
-            Connect one or more Gmail accounts so recruiter emails auto-sync to each application.
+            Connect one or more email accounts so recruiter emails auto-sync to each application.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {accountsQuery.isLoading ? (
             <Skeleton className="h-16 w-full" />
           ) : accounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No Gmail account connected yet.</p>
+            <p className="text-sm text-muted-foreground">No email account connected yet.</p>
           ) : (
             <div className="flex flex-col divide-y rounded-lg border">
               {accounts.map((account) => (
@@ -121,6 +184,9 @@ export function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <Mail className="size-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{account.email}</span>
+                    <Badge variant="secondary">
+                      {PROVIDER_LABELS[account.provider] ?? account.provider}
+                    </Badge>
                   </div>
                   <Button
                     variant="ghost"
@@ -136,24 +202,206 @@ export function SettingsPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-4 border-t pt-4">
+          {!configured ? (
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium">Email tracking</span>
               <span className="text-xs text-muted-foreground">
-                {configured
-                  ? "Read-only Gmail access to match emails to each application."
-                  : "Not configured — add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI to your environment."}
+                Not configured — add ENCRYPTION_KEY to your environment to connect email accounts.
               </span>
             </div>
-            {!configured ? (
-              <Badge className="bg-muted text-muted-foreground">Unconfigured</Badge>
-            ) : (
-              <Button onClick={() => getAuthUrl.mutate()} disabled={getAuthUrl.isPending}>
-                <Plus />
-                {accounts.length === 0 ? "Connect Gmail" : "Add Gmail account"}
-              </Button>
-            )}
-          </div>
+          ) : (
+            <form onSubmit={onSubmit} className="flex flex-col gap-4 border-t pt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="provider">
+                    Provider
+                    <Popover>
+                      <PopoverTrigger
+                        aria-label="How to connect this provider"
+                        className="ml-auto inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <Info className="size-3.5" />
+                      </PopoverTrigger>
+                      <PopoverContent className="max-h-[70vh] w-80 overflow-auto sm:w-96">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {(["gmail", "outlook", "imap"] as const).map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setGuideProvider(key)}
+                              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                activeGuide === key
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "text-muted-foreground hover:bg-muted"
+                              }`}
+                            >
+                              {PROVIDER_LABELS[key]}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <span className="text-sm font-semibold">{guide.title}</span>
+                          <ol className="flex list-decimal flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
+                            {guide.steps.map((step) => (
+                              <li key={step}>{step}</li>
+                            ))}
+                          </ol>
+                          {guide.url ? (
+                            <a
+                              href={guide.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-primary underline underline-offset-2"
+                            >
+                              {guide.urlLabel}
+                              <ExternalLink className="size-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </Label>
+                  <Select
+                    value={provider}
+                    onValueChange={(v) => {
+                      setProvider(v ?? "gmail");
+                      setGuideProvider(null);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a provider" />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectItem value="gmail">Gmail</SelectItem>
+                      <SelectItem value="outlook">Outlook</SelectItem>
+                      <SelectItem value="imap">Custom IMAP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    placeholder="you@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="appPassword">
+                  App password
+                  {appPasswordUrl ? (
+                    <a
+                      href={appPasswordUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      Get app password
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </Label>
+                <Input
+                  id="appPassword"
+                  type="password"
+                  required
+                  autoComplete="off"
+                  placeholder="16-character app password"
+                  value={appPassword}
+                  onChange={(e) => setAppPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  An app password lets an app read your inbox without your regular password.
+                </p>
+              </div>
+
+              {provider === "imap" ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="host">IMAP host</Label>
+                    <Input
+                      id="host"
+                      required
+                      placeholder="imap.example.com"
+                      value={host}
+                      onChange={(e) => setHost(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="port">Port</Label>
+                    <Input
+                      id="port"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={port}
+                      onChange={(e) => setPort(e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    Preset server for {PROVIDER_LABELS[provider]} will be used.
+                    <button
+                      type="button"
+                      className="ml-1 underline underline-offset-2 hover:text-foreground"
+                      onClick={() => setShowAdvanced((v) => !v)}
+                    >
+                      {showAdvanced ? "Hide" : "Advanced"}
+                    </button>
+                  </span>
+                  {showAdvanced ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="host">IMAP host</Label>
+                        <Input
+                          id="host"
+                          placeholder="Override server host"
+                          value={host}
+                          onChange={(e) => setHost(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="port">Port</Label>
+                        <Input
+                          id="port"
+                          type="number"
+                          min={1}
+                          max={65535}
+                          value={port}
+                          onChange={(e) => setPort(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium">Email tracking</span>
+                  <span className="text-xs text-muted-foreground">
+                    Read-only inbox access to match emails to each application.
+                  </span>
+                </div>
+                <Button type="submit" disabled={connect.isPending}>
+                  <KeyRound />
+                  {connect.isPending
+                    ? "Connecting…"
+                    : accounts.length === 0
+                      ? "Connect email"
+                      : "Add email account"}
+                </Button>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

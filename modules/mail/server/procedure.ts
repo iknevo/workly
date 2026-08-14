@@ -1,24 +1,63 @@
 import { TRPCError } from "@trpc/server";
+import type { SearchObject } from "imapflow";
 import { and, eq, inArray } from "drizzle-orm";
-import { google } from "googleapis";
 import { z } from "zod";
 
+import { env } from "@/config/env";
 import { db } from "@/db";
-import { applications, emails, gmailAccounts } from "@/db/schema";
+import { applications, emails, mailAccounts } from "@/db/schema";
 import {
-  buildSearchQueries,
+  buildImapSearchQueries,
   companyPhrase,
   evaluateEmail,
   isJunkLabels,
   parseEmailAddress,
   type ScoreContext,
 } from "@/lib/email-matching";
-import { decrypt } from "@/lib/encryption";
-import { getGmailAuthUrl, getOAuthClient, isGmailConfigured } from "@/lib/gmail";
+import { decrypt, encrypt } from "@/lib/encryption";
+import {
+  formatEnvelopeAddress,
+  ImapSession,
+  makeSnippet,
+  parseBodyText,
+  resolveImapConfig,
+  verifyConnection,
+  type MailProvider,
+} from "@/lib/imap";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 const PER_QUERY_EVAL_BUDGET = 100;
 const TOTAL_LIST_CAP = 2000;
+
+function friendlyImapError(err: unknown, provider: MailProvider): string {
+  const error = err as
+    | (Error & {
+        authenticationFailed?: boolean;
+        serverResponseCode?: string;
+        responseText?: string;
+        responseStatus?: string;
+      })
+    | undefined;
+  const message = error?.message ?? String(err);
+  const responseText = error?.responseText ?? "";
+  const lower = `${message} ${responseText}`.toLowerCase();
+
+  if (
+    error?.authenticationFailed ||
+    error?.serverResponseCode === "AUTHENTICATIONFAILED" ||
+    lower.includes("invalid credentials") ||
+    lower.includes("authentication failed")
+  ) {
+    return `Sign-in failed for ${provider}. Check the email and app password, and make sure 2-Step Verification is enabled for the account.`;
+  }
+  if (
+    lower.includes("imap") &&
+    (lower.includes("disabled") || lower.includes("not enabled") || lower.includes("permission"))
+  ) {
+    return "IMAP access is disabled for this account. Enable it: Gmail Settings → Forwarding and POP/IMAP → Enable IMAP.";
+  }
+  return `Could not connect to ${provider}: ${message}`;
+}
 
 async function performSync(userId: string, applicationId: string) {
   const [application] = await db
@@ -28,18 +67,13 @@ async function performSync(userId: string, applicationId: string) {
     .limit(1);
   if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
-  const accounts = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
+  const accounts = await db.select().from(mailAccounts).where(eq(mailAccounts.userId, userId));
   if (accounts.length === 0) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Connect a Gmail account first." });
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Connect an email account first." });
   }
 
   const keywords = (application.mailKeywords ?? []).map((k) => k.trim()).filter(Boolean);
   const exclusions = (application.mailExclusions ?? []).map((e) => e.trim()).filter(Boolean);
-  const queries = buildSearchQueries({
-    company: application.company,
-    keywords,
-    exclusions,
-  });
 
   const context: ScoreContext = {
     companyPhrase: companyPhrase(application.company),
@@ -50,113 +84,101 @@ async function performSync(userId: string, applicationId: string) {
   let removedCount = 0;
 
   for (const account of accounts) {
-    try {
-      const oauth2Client = getOAuthClient();
-      oauth2Client.setCredentials({ refresh_token: decrypt(account.refreshToken) });
-      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+    const config = resolveImapConfig({
+      provider: account.provider as MailProvider,
+      email: account.email,
+      appPassword: decrypt(account.appPassword),
+      host: account.host,
+      port: account.port,
+      folder: account.folder,
+    });
 
-      const processed = new Set<string>();
+    const session = new ImapSession(config);
+    try {
+      await session.connect();
+      const folder = await session.resolveFolder();
+      await session.open(folder);
+
+      const queries = buildImapSearchQueries({
+        company: application.company,
+        keywords,
+        exclusions,
+        gmail: account.provider === "gmail",
+      });
+
+      const processed = new Set<number>();
       let totalListed = 0;
 
       for (const query of queries) {
         let evaluatedThisQuery = 0;
-        let pageToken: string | undefined;
-        let exhausted = false;
 
-        while (
-          !exhausted &&
-          evaluatedThisQuery < PER_QUERY_EVAL_BUDGET &&
-          totalListed < TOTAL_LIST_CAP
-        ) {
-          const res = await gmail.users.messages.list({
-            userId: "me",
-            q: query,
-            maxResults: 100,
-            pageToken,
-            fields: "messages(id,threadId,labelIds),nextPageToken",
+        const uids = await session.search(query as SearchObject);
+        totalListed += uids.length;
+        if (totalListed > TOTAL_LIST_CAP) uids.length = Math.max(0, TOTAL_LIST_CAP - (totalListed - uids.length));
+
+        const knownRows =
+          uids.length > 0
+            ? await db
+                .select({ messageUid: emails.messageUid })
+                .from(emails)
+                .where(
+                  and(eq(emails.mailAccountId, account.id), inArray(emails.messageUid, uids))
+                )
+            : [];
+        const known = new Set(knownRows.map((r) => r.messageUid));
+
+        for (const uid of uids) {
+          if (evaluatedThisQuery >= PER_QUERY_EVAL_BUDGET) break;
+          if (processed.has(uid) || known.has(uid)) continue;
+          processed.add(uid);
+          evaluatedThisQuery += 1;
+
+          const fetched = await session.fetch(uid);
+          if (!fetched) continue;
+          if (isJunkLabels(fetched.labels)) continue;
+
+          const from = formatEnvelopeAddress(fetched.envelope.from);
+          const subject = fetched.envelope.subject ?? "";
+          const snippet = await makeSnippet(fetched.source);
+          const bodyText = await parseBodyText(fetched.source);
+
+          const { include, score, reasons } = evaluateEmail({
+            from,
+            subject,
+            snippet,
+            context,
           });
+          if (!include) continue;
 
-          const messages = (res.data.messages ?? []).filter(
-            (m): m is { id: string; threadId?: string | null; labelIds?: string[] | null } =>
-              Boolean(m.id)
-          );
-          totalListed += messages.length;
+          const [email] = await db
+            .insert(emails)
+            .values({
+              applicationId: application.id,
+              mailAccountId: account.id,
+              messageUid: uid,
+              threadId: null,
+              subject: subject || null,
+              fromEmail: from || null,
+              toEmail: formatEnvelopeAddress(fetched.envelope.to) || null,
+              senderEmail: parseEmailAddress(from) || null,
+              snippet: snippet || null,
+              bodyText: bodyText || null,
+              relevanceScore: score,
+              matchReasons: reasons,
+              internalDate: fetched.internalDate ?? fetched.envelope.date ?? null,
+              isRead: fetched.flags.has("\\Seen"),
+            })
+            .onConflictDoNothing()
+            .returning();
 
-          const ids = messages.map((m) => m.id);
-          const knownRows =
-            ids.length > 0
-              ? await db
-                  .select({ gmailMessageId: emails.gmailMessageId })
-                  .from(emails)
-                  .where(
-                    and(
-                      eq(emails.gmailAccountId, account.id),
-                      inArray(emails.gmailMessageId, ids)
-                    )
-                  )
-              : [];
-          const known = new Set(knownRows.map((r) => r.gmailMessageId));
-
-          for (const message of messages) {
-            if (evaluatedThisQuery >= PER_QUERY_EVAL_BUDGET) break;
-            if (processed.has(message.id) || known.has(message.id)) continue;
-            processed.add(message.id);
-
-            if (isJunkLabels(message.labelIds ?? [])) continue;
-            evaluatedThisQuery += 1;
-
-            const detail = await gmail.users.messages.get({
-              userId: "me",
-              id: message.id,
-              format: "metadata",
-              metadataHeaders: ["Subject", "From", "To"],
-            });
-            const headers = detail.data.payload?.headers ?? [];
-            const getHeader = (name: string) =>
-              headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
-
-            const from = getHeader("From") ?? "";
-            const subject = getHeader("Subject") ?? "";
-            const internalDate = detail.data.internalDate
-              ? new Date(Number(detail.data.internalDate))
-              : null;
-
-            const { include, score, reasons } = evaluateEmail({
-              from,
-              subject,
-              snippet: detail.data.snippet ?? "",
-              context,
-            });
-            if (!include) continue;
-
-            const [email] = await db
-              .insert(emails)
-              .values({
-                applicationId: application.id,
-                gmailAccountId: account.id,
-                gmailMessageId: message.id,
-                threadId: detail.data.threadId ?? null,
-                subject: subject || null,
-                fromEmail: from || null,
-                toEmail: getHeader("To") ?? null,
-                senderEmail: parseEmailAddress(from) || null,
-                snippet: detail.data.snippet ?? null,
-                relevanceScore: score,
-                matchReasons: reasons,
-                internalDate,
-              })
-              .onConflictDoNothing()
-              .returning();
-
-            if (email) inserted.push(email);
-          }
-
-          pageToken = res.data.nextPageToken ?? undefined;
-          exhausted = !pageToken;
+          if (email) inserted.push(email);
         }
       }
     } catch (err) {
-      console.error("Gmail sync error", err);
+      console.error("IMAP sync error", err);
+    } finally {
+      session.release();
+      await session.close();
     }
   }
 
@@ -194,34 +216,97 @@ async function performSync(userId: string, applicationId: string) {
 
 export const mailRouter = createTRPCRouter({
   isConfigured: protectedProcedure.query(async () => {
-    return { configured: isGmailConfigured() };
+    return { configured: Boolean(env.ENCRYPTION_KEY) };
   }),
 
-  getAuthUrl: protectedProcedure.mutation(async ({ ctx }) => {
-    if (!isGmailConfigured()) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "Gmail integration is not configured. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI to your environment.",
-      });
-    }
-    return getGmailAuthUrl(ctx.user.id);
-  }),
+  connect: protectedProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        appPassword: z.string().min(1, "App password is required"),
+        provider: z.enum(["gmail", "outlook", "yahoo", "icloud", "imap"]),
+        host: z.string().trim().optional(),
+        port: z.number().int().min(1).max(65535).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!env.ENCRYPTION_KEY) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Email integration is not configured. Add ENCRYPTION_KEY to your environment.",
+        });
+      }
+
+      const config = resolveImapConfig(input);
+      if (input.provider === "imap" && !config.host) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Custom IMAP requires a server host.",
+        });
+      }
+
+      let verified;
+      try {
+        verified = await verifyConnection(config);
+      } catch (err) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: friendlyImapError(err, config.provider),
+        });
+      }
+
+      const folder =
+        config.provider === "gmail"
+          ? verified.allMailPath ?? "[Gmail]/All Mail"
+          : config.folder;
+
+      const [account] = await db
+        .insert(mailAccounts)
+        .values({
+          userId: ctx.user.id,
+          email: config.email,
+          provider: config.provider,
+          host: config.host,
+          port: config.port,
+          appPassword: encrypt(config.appPassword),
+          folder,
+        })
+        .onConflictDoUpdate({
+          target: [mailAccounts.userId, mailAccounts.email],
+          set: {
+            provider: config.provider,
+            host: config.host,
+            port: config.port,
+            appPassword: encrypt(config.appPassword),
+            folder,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: mailAccounts.id, email: mailAccounts.email, provider: mailAccounts.provider });
+
+      return account;
+    }),
 
   getAccounts: protectedProcedure.query(async ({ ctx }) => {
     return db
-      .select({ id: gmailAccounts.id, email: gmailAccounts.email, createdAt: gmailAccounts.createdAt })
-      .from(gmailAccounts)
-      .where(eq(gmailAccounts.userId, ctx.user.id));
+      .select({
+        id: mailAccounts.id,
+        email: mailAccounts.email,
+        provider: mailAccounts.provider,
+        createdAt: mailAccounts.createdAt,
+      })
+      .from(mailAccounts)
+      .where(eq(mailAccounts.userId, ctx.user.id));
   }),
 
   disconnect: protectedProcedure
     .input(z.object({ accountId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [deleted] = await db
-        .delete(gmailAccounts)
-        .where(and(eq(gmailAccounts.id, input.accountId), eq(gmailAccounts.userId, ctx.user.id)))
-        .returning({ id: gmailAccounts.id });
+        .delete(mailAccounts)
+        .where(and(eq(mailAccounts.id, input.accountId), eq(mailAccounts.userId, ctx.user.id)))
+        .returning({ id: mailAccounts.id });
       if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
       return deleted;
     }),
@@ -251,6 +336,71 @@ export const mailRouter = createTRPCRouter({
         keywords: application.mailKeywords ?? [],
         emails: emailRows,
       };
+    }),
+
+  getEmail: protectedProcedure
+    .input(z.object({ emailId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [email] = await db
+        .select({
+          id: emails.id,
+          applicationId: emails.applicationId,
+          messageUid: emails.messageUid,
+          bodyText: emails.bodyText,
+          account: {
+            id: mailAccounts.id,
+            provider: mailAccounts.provider,
+            email: mailAccounts.email,
+            appPassword: mailAccounts.appPassword,
+            host: mailAccounts.host,
+            port: mailAccounts.port,
+            folder: mailAccounts.folder,
+          },
+        })
+        .from(emails)
+        .innerJoin(mailAccounts, eq(emails.mailAccountId, mailAccounts.id))
+        .where(eq(emails.id, input.emailId))
+        .limit(1);
+      if (!email) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [application] = await db
+        .select({ id: applications.id })
+        .from(applications)
+        .where(
+          and(eq(applications.id, email.applicationId), eq(applications.userId, ctx.user.id))
+        )
+        .limit(1);
+      if (!application) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (email.bodyText) return { bodyText: email.bodyText };
+
+      const config = resolveImapConfig({
+        provider: email.account.provider as MailProvider,
+        email: email.account.email,
+        appPassword: decrypt(email.account.appPassword),
+        host: email.account.host,
+        port: email.account.port,
+        folder: email.account.folder,
+      });
+
+      const session = new ImapSession(config);
+      try {
+        await session.connect();
+        const folder = await session.resolveFolder();
+        await session.open(folder);
+        const fetched = await session.fetch(email.messageUid, { sourceMaxLength: 1_000_000 });
+        const bodyText = fetched ? await parseBodyText(fetched.source) : "";
+        if (bodyText) {
+          await db.update(emails).set({ bodyText, updatedAt: new Date() }).where(eq(emails.id, email.id));
+        }
+        return { bodyText: bodyText || null };
+      } catch (err) {
+        console.error("IMAP email fetch error", err);
+        return { bodyText: null };
+      } finally {
+        session.release();
+        await session.close();
+      }
     }),
 
   updateKeywords: protectedProcedure

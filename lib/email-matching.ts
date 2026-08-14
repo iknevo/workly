@@ -74,6 +74,61 @@ export function buildSearchQueries({
   return queries;
 }
 
+export type ImapSearchQuery = {
+  from?: string;
+  subject?: string;
+  since?: Date;
+  not?: ImapSearchQuery;
+  or?: ImapSearchQuery[];
+  gmraw?: string;
+};
+
+export function buildImapSearchQueries({
+  company,
+  keywords = [],
+  exclusions = [],
+  gmail = false,
+}: {
+  company: string;
+  keywords?: string[];
+  exclusions?: string[];
+  gmail?: boolean;
+}): ImapSearchQuery[] {
+  if (gmail) {
+    return buildSearchQueries({ company, keywords, exclusions }).map(
+      (query) => ({ gmraw: query })
+    );
+  }
+
+  const normalized = keywords.map((k) => k.trim().toLowerCase()).filter(Boolean);
+  const domainKeywords = normalized.filter(isDomainKeyword).map((k) =>
+    k.replace(/[^a-z0-9.\-]/g, "")
+  );
+  const textTerms = [
+    companyPhrase(company),
+    ...normalized.filter((k) => !isDomainKeyword(k)).map(sanitizePhrase),
+  ].filter((t) => t.length > 0);
+
+  const since = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+
+  const clauses: ImapSearchQuery[] = [];
+  for (const domain of domainKeywords) clauses.push({ from: domain });
+  for (const term of textTerms) {
+    clauses.push({ subject: term });
+    clauses.push({ from: term });
+  }
+
+  const query: ImapSearchQuery = { since };
+  if (clauses.length === 1) Object.assign(query, clauses[0]);
+  else if (clauses.length > 1) query.or = clauses;
+
+  const clean = exclusions.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (clean.length === 1) query.not = { from: clean[0] };
+  else if (clean.length > 1) query.not = { or: clean.map((e) => ({ from: e })) };
+
+  return [query];
+}
+
 export type ScoreContext = {
   companyPhrase: string;
   keywords: string[];
