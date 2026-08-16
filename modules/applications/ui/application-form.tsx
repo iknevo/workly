@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -61,7 +61,7 @@ export function ApplicationForm({
     },
   });
 
-  const [company, position] = form.watch(["company", "position"]);
+  const [company, position] = useWatch({ control: form.control, name: ["company", "position"] });
 
   const statusItems = Object.entries(APPLICATION_STATUS_CONFIG).map(([value, config]) => ({
     value,

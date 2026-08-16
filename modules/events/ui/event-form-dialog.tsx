@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2 } from "lucide-react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ export function EventFormDialog({
     },
   });
 
-  const [title, startTime] = form.watch(["title", "startTime"]);
+  const [title, startTime] = useWatch({ control: form.control, name: ["title", "startTime"] });
 
   const create = useMutation(
     trpc.events.create.mutationOptions({

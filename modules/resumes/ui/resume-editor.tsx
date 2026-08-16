@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -90,8 +90,8 @@ export function ResumeEditor({
     },
   });
 
-  const title = form.watch("title");
-  const content = form.watch("content");
+  const title = useWatch({ control: form.control, name: "title" });
+  const content = useWatch({ control: form.control, name: "content" });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<CompileStatus>("idle");
   const [compileError, setCompileError] = useState<string | null>(null);

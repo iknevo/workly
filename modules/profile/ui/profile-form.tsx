@@ -10,7 +10,7 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ export function ProfileForm({
     defaultValues: toForm(profile),
   });
 
-  const name = form.watch("name");
+  const name = useWatch({ control: form.control, name: "name" });
 
   return (
     <form className="flex flex-col gap-6" onSubmit={form.handleSubmit((values) => onSave(values))}>
