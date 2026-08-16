@@ -87,7 +87,35 @@ export const profileEducationSchema = z
     notes: e.notes || null,
   }));
 
-export const profileSkillsSchema = z.array(z.string().trim().max(100));
+export const profileSkillsSchema = z.array(
+  z.object({
+    category: z.string().trim().max(100),
+    items: z.array(z.string().trim().max(100)).max(100),
+  })
+);
+
+export type ProfileSkillGroup = z.infer<typeof profileSkillsSchema>[number];
+
+export function normalizeSkills(
+  value: string[] | ProfileSkillGroup[] | null | undefined,
+  preserveEmpty = false
+): ProfileSkillGroup[] {
+  if (!Array.isArray(value)) return [];
+  if (value.length === 0 || typeof value[0] === "string") {
+    const items = (value as string[])
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((s, i, arr) => arr.indexOf(s) === i);
+    if (items.length === 0) return [];
+    return [{ category: "Skills", items }];
+  }
+  const groups = (value as ProfileSkillGroup[]).map((group) => ({
+    category: group.category.trim(),
+    items: Array.from(new Set(group.items.map((s) => s.trim()).filter(Boolean))),
+  }));
+  if (preserveEmpty) return groups;
+  return groups.filter((group) => group.category.length > 0 && group.items.length > 0);
+}
 
 export const profileUpdateSchema = z
   .object({
@@ -99,7 +127,7 @@ export const profileUpdateSchema = z
     phone: z.string().trim().max(100).nullable(),
     location: z.string().trim().max(200).nullable(),
     summary: z.string().trim().max(5000).nullable(),
-    skills: profileSkillsSchema,
+    skills: z.union([profileSkillsSchema, z.array(z.string().trim().max(100))]),
     experience: z.array(profileExperienceSchema),
     education: z.array(profileEducationSchema),
     projects: z.array(profileProjectSchema),
@@ -112,7 +140,7 @@ export const profileUpdateSchema = z
     phone: v.phone || null,
     location: v.location || null,
     summary: v.summary || null,
-    skills: v.skills.filter(Boolean),
+    skills: normalizeSkills(v.skills),
     experience: v.experience.filter((e) => e.role && e.company),
     education: v.education.filter((e) => e.school && e.degree),
     projects: v.projects.filter((p) => p.name && p.description),
@@ -161,7 +189,7 @@ export const users = pgTable(
     phone: text("phone"),
     location: text("location"),
     summary: text("summary"),
-    skills: jsonb("skills").$type<string[]>(),
+    skills: jsonb("skills").$type<ProfileSkillGroup[]>(),
     experience: jsonb("experience").$type<ProfileExperience[]>(),
     education: jsonb("education").$type<ProfileEducation[]>(),
     projects: jsonb("projects").$type<ProfileProject[]>(),

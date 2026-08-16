@@ -4,8 +4,9 @@ import { Controller } from "react-hook-form";
 import type { Control } from "react-hook-form";
 
 import type { ProfileFormInput } from "@/db/schema";
+import { normalizeSkills } from "@/db/schema";
 
-import { Field, TagsEditor } from "../editors";
+import { Field, SkillGroupsEditor } from "../editors";
 
 export function SkillsTab({ control }: { control: Control<ProfileFormInput> }) {
   return (
@@ -14,11 +15,10 @@ export function SkillsTab({ control }: { control: Control<ProfileFormInput> }) {
       control={control}
       render={({ field }) => (
         <Field label="Skills">
-          <TagsEditor
-            value={field.value}
+          <SkillGroupsEditor
+            value={normalizeSkills(field.value, true)}
             onChange={field.onChange}
-            placeholder="e.g. TypeScript, React, PostgreSQL"
-            addLabel="Add skill"
+            addLabel="Add category"
           />
         </Field>
       )}

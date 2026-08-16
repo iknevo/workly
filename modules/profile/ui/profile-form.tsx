@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { profileUpdateSchema } from "@/db/schema";
+import { normalizeSkills, profileUpdateSchema } from "@/db/schema";
 import type { ProfileFormInput, ProfileProject, UserProfile } from "@/db/schema";
 
 import { BasicsTab } from "./tabs/basics-tab";
@@ -42,7 +42,7 @@ const toForm = (profile: UserProfile): ProfileFormInput => ({
   phone: profile.phone ?? "",
   location: profile.location ?? "",
   summary: profile.summary ?? "",
-  skills: profile.skills,
+  skills: normalizeSkills(profile.skills),
   experience: profile.experience.map((e) => ({
     role: e.role,
     company: e.company,

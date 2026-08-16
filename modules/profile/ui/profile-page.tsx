@@ -8,6 +8,8 @@ import { toast } from "@/components/ui/toast";
 
 import { useTRPC } from "@/trpc/client";
 
+import { normalizeSkills } from "@/db/schema";
+
 import { ProfileForm } from "@/modules/profile/ui/profile-form";
 
 export function ProfilePage() {
@@ -25,7 +27,7 @@ export function ProfilePage() {
         phone: me.phone,
         location: me.location,
         summary: me.summary,
-        skills: me.skills ?? [],
+        skills: normalizeSkills(me.skills),
         experience: me.experience ?? [],
         education: me.education ?? [],
         projects: me.projects ?? [],

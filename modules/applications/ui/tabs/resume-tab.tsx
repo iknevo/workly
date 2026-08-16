@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 
 import { useConfirm } from "@/hooks/use-confirm";
+import { normalizeSkills } from "@/db/schema";
 import { ResumeCodeViewer } from "@/modules/resumes/ui/resume-code-viewer";
 import { useTRPC } from "@/trpc/client";
 
@@ -53,7 +54,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
   const profile = profileQuery.data;
   const profileHasData = Boolean(
     profile?.experience?.length ||
-    profile?.skills?.length ||
+    normalizeSkills(profile?.skills).some((g) => g.items.length) ||
     profile?.projects?.length ||
     profile?.education?.length
   );

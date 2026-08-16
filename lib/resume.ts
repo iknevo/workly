@@ -1,4 +1,11 @@
-import type { ProfileEducation, ProfileExperience, ProfileLink, ProfileProject } from "@/db/schema";
+import type {
+  ProfileEducation,
+  ProfileExperience,
+  ProfileLink,
+  ProfileProject,
+  ProfileSkillGroup,
+} from "@/db/schema";
+import { normalizeSkills } from "@/db/schema";
 
 const LATEX_PREAMBLE = `\\documentclass[11pt, a4paper]{article}
 
@@ -71,7 +78,7 @@ export interface ResumeProfile {
   phone: string | null;
   location: string | null;
   summary: string | null;
-  skills: string[] | null;
+  skills: ProfileSkillGroup[] | null;
   experience: ProfileExperience[] | null;
   education: ProfileEducation[] | null;
   projects: ProfileProject[] | null;
@@ -113,7 +120,7 @@ export function hasResumeData(profile: ResumeProfile): boolean {
   return Boolean(
     profile.name?.trim() ||
       profile.experience?.length ||
-      profile.skills?.length ||
+      normalizeSkills(profile.skills).some((g) => g.items.length) ||
       profile.projects?.length ||
       profile.education?.length
   );
@@ -276,12 +283,12 @@ export function buildResumeLatex(profile: ResumeProfile): string {
     sections.push(`\\section{Projects}\n\\begin{itemize}\n${items.join("\n")}\n\\end{itemize}`);
   }
 
-  const skills = (profile.skills ?? []).map((s) => s.trim()).filter(Boolean);
+  const skills = normalizeSkills(profile.skills);
   if (skills.length) {
     sections.push(
-      `\\section{Skills \\& Tools}\n\\begin{itemize}\n${skills
-        .map((s) => `    \\item ${escapeLatex(s)}`)
-        .join("\n")}\n\\end{itemize}`
+      `\\section{Skills \\& Tools}\n${skills
+        .map((group) => `\\textbf{${escapeLatex(group.category)}:} ${escapeLatex(group.items.join(", "))} \\\\`)
+        .join("\n")}`
     );
   }
 

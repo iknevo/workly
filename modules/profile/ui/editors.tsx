@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Controller } from "react-hook-form";
 import type { Control } from "react-hook-form";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-import type { ProfileFormInput } from "@/db/schema";
+import type { ProfileFormInput, ProfileSkillGroup } from "@/db/schema";
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -179,6 +179,108 @@ export function TagsEditor({
           }}
         />
         <Button variant="outline" size="sm" onClick={add} disabled={disabled || !input.trim()}>
+          <Plus />
+          {addLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function SkillGroupsEditor({
+  value,
+  onChange,
+  addLabel = "Add category",
+  disabled = false,
+}: {
+  value: ProfileSkillGroup[];
+  onChange: (next: ProfileSkillGroup[]) => void;
+  addLabel?: string;
+  disabled?: boolean;
+}) {
+  const addGroup = () => {
+    if (disabled) return;
+    onChange([...value, { category: "", items: [] }]);
+  };
+
+  const updateGroup = (i: number, patch: Partial<ProfileSkillGroup>) => {
+    onChange(value.map((group, j) => (j === i ? { ...group, ...patch } : group)));
+  };
+
+  const removeGroup = (i: number) => onChange(value.filter((_, j) => j !== i));
+
+  const moveGroup = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= value.length) return;
+    const next = [...value];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  const lastGroupIsEmpty =
+    value.length > 0 &&
+    value[value.length - 1].category.trim() === "" &&
+    value[value.length - 1].items.length === 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {value.length === 0 ? (
+        <p className="text-sm text-muted-foreground">None yet.</p>
+      ) : (
+        value.map((group, i) => (
+          <div key={i} className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+            <div className="flex items-center gap-2">
+              <Input
+                value={group.category}
+                onChange={(e) => updateGroup(i, { category: e.target.value })}
+                placeholder="Category (e.g. Languages)"
+                disabled={disabled}
+              />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => moveGroup(i, -1)}
+                disabled={disabled || i === 0}
+                aria-label="Move category up"
+              >
+                <ChevronUp />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => moveGroup(i, 1)}
+                disabled={disabled || i === value.length - 1}
+                aria-label="Move category down"
+              >
+                <ChevronDown />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => removeGroup(i)}
+                disabled={disabled}
+                aria-label="Remove category"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+            <TagsEditor
+              value={group.items}
+              onChange={(items) => updateGroup(i, { items })}
+              placeholder="e.g. TypeScript, React, PostgreSQL"
+              addLabel="Add skill"
+              disabled={disabled}
+            />
+          </div>
+        ))
+      )}
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addGroup}
+          disabled={disabled || lastGroupIsEmpty}
+        >
           <Plus />
           {addLabel}
         </Button>
