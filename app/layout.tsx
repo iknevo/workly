@@ -4,11 +4,11 @@ import { Geist_Mono, Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 import { ThemeProvider } from "@/components/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toast";
-import { TRPCReactProvider } from "@/trpc/client";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import "./globals.css";
+import { TRPCReactProvider } from "@/trpc/client";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -23,11 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
-    >
+    <html lang="en" className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}>
       <body>
         <ThemeProvider>
           <ClerkProvider afterSignOutUrl="/">
