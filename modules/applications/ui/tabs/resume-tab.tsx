@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -26,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 
+import { useConfirm } from "@/hooks/use-confirm";
 import { ResumeCodeViewer } from "@/modules/resumes/ui/resume-code-viewer";
 import { useTRPC } from "@/trpc/client";
 
@@ -33,6 +33,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
+  const [ConfirmationDialog, confirm] = useConfirm();
   const [selectedBaseResume, setSelectedBaseResume] = useState("");
   const [viewResumeId, setViewResumeId] = useState<string | null>(null);
 
@@ -91,6 +92,14 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
     })
   );
 
+  async function handleDelete(resumeId: string) {
+    const ok = await confirm({
+      title: "Delete tailored resume",
+      message: "This tailored resume will be permanently deleted. This can't be undone.",
+    });
+    if (ok) remove.mutate({ resumeId });
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -141,9 +150,11 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
             </Button>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            {profileHasData
-              ? "No base resume selected — the AI builds from your profile."
-              : "Your profile is empty. Add experience or skills on the Profile page, or select a base resume."}
+            {hasBaseResume
+              ? `The AI will rewrite "${formattedResumes.find((r) => r.value === selectedBaseResume)?.label ?? ""}" to match this job.`
+              : profileHasData
+                ? "No base resume selected — the AI builds from your profile."
+                : "Your profile is empty. Add experience or skills on the Profile page, or select a base resume."}
           </p>
         </CardContent>
       </Card>
@@ -173,11 +184,6 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
                     <span className="truncate text-sm font-semibold">
                       Tailored resume #{applicationResumes.indexOf(resume) + 1}
                     </span>
-                    {resume.model && (
-                      <Badge variant="secondary" className="font-mono text-[10px]">
-                        {resume.model}
-                      </Badge>
-                    )}
                   </div>
                   <span className="text-xs text-muted-foreground">
                     Generated {resume.createdAt.toLocaleString()}
@@ -190,7 +196,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => remove.mutate({ resumeId: resume.id })}
+                    onClick={() => handleDelete(resume.id)}
                     disabled={remove.isPending}
                   >
                     <Trash2 />
@@ -207,6 +213,8 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
         resumeId={viewResumeId}
         onClose={() => setViewResumeId(null)}
       />
+
+      <ConfirmationDialog />
     </div>
   );
 }
