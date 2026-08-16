@@ -17,6 +17,7 @@ import { useTRPC } from "@/trpc/client";
 
 export type MailEmail = {
   id: string;
+  mailAccountId: string;
   subject: string | null;
   fromEmail: string | null;
   toEmail: string | null;
@@ -50,6 +51,7 @@ export function mailInitials(from: string | null): string {
 type EmailPreviewDrawerProps = {
   email: MailEmail | null;
   applicationId: string;
+  accountEmail?: string | null;
   onOpenChange: (open: boolean) => void;
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
@@ -61,6 +63,7 @@ type EmailPreviewDrawerProps = {
 export function EmailPreviewDrawer({
   email,
   applicationId,
+  accountEmail,
   onOpenChange,
   onPrev,
   onNext,
@@ -182,6 +185,10 @@ export function EmailPreviewDrawer({
 
               {email.toEmail ? (
                 <p className="break-words text-xs text-muted-foreground">To: {email.toEmail}</p>
+              ) : null}
+
+              {accountEmail ? (
+                <p className="break-words text-xs text-muted-foreground">Via: {accountEmail}</p>
               ) : null}
 
               {(email.matchReasons?.length ?? 0) > 0 ? (

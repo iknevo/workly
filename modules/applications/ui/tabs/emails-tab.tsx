@@ -32,6 +32,7 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
   const emailsQuery = useQuery(trpc.mail.getForApplication.queryOptions({ applicationId }));
 
   const accounts = accountsQuery.data ?? [];
+  const accountEmailById = new Map(accounts.map((account) => [account.id, account.email]));
   const searchConfig = emailsQuery.data;
   const emails = searchConfig?.emails ?? [];
   const visibleEmails = emails
@@ -294,67 +295,9 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
         </Card>
       ) : (
         <div className="flex min-w-0 flex-col divide-y overflow-hidden rounded-lg border bg-card">
-          {visibleEmails.map((email) => (
-            <div
-              key={email.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedEmail(email)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setSelectedEmail(email);
-                }
-              }}
-              className="group flex w-full min-w-0 cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                {mailInitials(email.fromEmail)}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="flex items-center gap-2">
-                  {!email.isRead && (
-                    <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
-                  )}
-                  <span
-                    className={`truncate ${email.isRead ? "font-medium text-muted-foreground" : "font-semibold"}`}
-                  >
-                    {email.subject || "(no subject)"}
-                  </span>
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {email.fromEmail}
-                  {email.internalDate ? ` · ${email.internalDate.toLocaleDateString()}` : ""}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideEmail.mutate({ emailId: email.id, applicationId });
-                  }}
-                  title="Hide email"
-                  className="opacity-0 group-hover:opacity-100 max-sm:opacity-100"
-                >
-                  <EyeOff className="size-4" />
-                </Button>
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {hiddenEmails.length > 0 && (
-        <Collapsible className="flex flex-col gap-2">
-          <CollapsibleTrigger
-            render={<Button variant="ghost" size="sm" className="w-full text-muted-foreground" />}
-          >
-            Hidden ({hiddenEmails.length})
-          </CollapsibleTrigger>
-          <CollapsibleContent className="flex flex-col divide-y overflow-hidden rounded-lg border border-dashed bg-muted/30">
-            {hiddenEmails.map((email) => (
+          {visibleEmails.map((email) => {
+            const accountEmail = accountEmailById.get(email.mailAccountId);
+            return (
               <div
                 key={email.id}
                 role="button"
@@ -368,30 +311,120 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                 }}
                 className="group flex w-full min-w-0 cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                   {mailInitials(email.fromEmail)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm">{email.subject || "(no subject)"}</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {email.fromEmail}
-                    {email.internalDate ? ` · ${email.internalDate.toLocaleDateString()}` : ""}
+                  <span className="flex items-center gap-2">
+                    {!email.isRead && (
+                      <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+                    )}
+                    <span
+                      className={`truncate ${email.isRead ? "font-medium text-muted-foreground" : "font-semibold"}`}
+                    >
+                      {email.subject || "(no subject)"}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-xs text-muted-foreground">{email.fromEmail}</span>
+                    {accountEmail ? (
+                      <Badge
+                        variant="outline"
+                        title={`Received in ${accountEmail}`}
+                        className="shrink-0 text-[10px] font-normal text-muted-foreground"
+                      >
+                        {accountEmail}
+                      </Badge>
+                    ) : null}
+                    {email.internalDate ? (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {email.internalDate.toLocaleDateString()}
+                      </span>
+                    ) : null}
                   </span>
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    unhideEmail.mutate({ emailId: email.id, applicationId });
-                  }}
-                  className="shrink-0 text-muted-foreground"
-                >
-                  <Undo2 />
-                  Restore
-                </Button>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      hideEmail.mutate({ emailId: email.id, applicationId });
+                    }}
+                    title="Hide email"
+                    className="opacity-0 group-hover:opacity-100 max-sm:opacity-100"
+                  >
+                    <EyeOff className="size-4" />
+                  </Button>
+                </span>
               </div>
-            ))}
+            );
+          })}
+        </div>
+      )}
+
+      {hiddenEmails.length > 0 && (
+        <Collapsible className="flex flex-col gap-2">
+          <CollapsibleTrigger
+            render={<Button variant="ghost" size="sm" className="w-full text-muted-foreground" />}
+          >
+            Hidden ({hiddenEmails.length})
+          </CollapsibleTrigger>
+          <CollapsibleContent className="flex flex-col divide-y overflow-hidden rounded-lg border border-dashed bg-muted/30">
+            {hiddenEmails.map((email) => {
+              const accountEmail = accountEmailById.get(email.mailAccountId);
+              return (
+                <div
+                  key={email.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedEmail(email)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedEmail(email);
+                    }
+                  }}
+                  className="group flex w-full min-w-0 cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                    {mailInitials(email.fromEmail)}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm">{email.subject || "(no subject)"}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-xs text-muted-foreground">{email.fromEmail}</span>
+                      {accountEmail ? (
+                        <Badge
+                          variant="outline"
+                          title={`Received in ${accountEmail}`}
+                          className="shrink-0 text-[10px] font-normal text-muted-foreground"
+                        >
+                          {accountEmail}
+                        </Badge>
+                      ) : null}
+                      {email.internalDate ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {email.internalDate.toLocaleDateString()}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      unhideEmail.mutate({ emailId: email.id, applicationId });
+                    }}
+                    className="shrink-0 text-muted-foreground"
+                  >
+                    <Undo2 />
+                    Restore
+                  </Button>
+                </div>
+              );
+            })}
           </CollapsibleContent>
         </Collapsible>
       )}
@@ -399,6 +432,9 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
       <EmailPreviewDrawer
         email={selectedEmail}
         applicationId={applicationId}
+        accountEmail={
+          selectedEmail ? accountEmailById.get(selectedEmail.mailAccountId) : undefined
+        }
         onOpenChange={(open) => {
           if (!open) setSelectedEmail(null);
         }}
