@@ -1,16 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CalendarIcon, ChevronDown, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,17 +20,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { applications } from "@/db/schema";
 import { insertApplicationSchema } from "@/db/schema";
 import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
-import { useTRPC } from "@/trpc/client";
 
 type Application = typeof applications.$inferSelect;
 
-export const applicationFormSchema = insertApplicationSchema.omit({ userId: true, mailKeywords: true });
+export const applicationFormSchema = insertApplicationSchema.omit({
+  userId: true,
+  mailKeywords: true,
+  baseResumeId: true,
+});
 export type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 export function ApplicationForm({
@@ -46,10 +46,6 @@ export function ApplicationForm({
   submitLabel: string;
   submitting: boolean;
 }) {
-  const trpc = useTRPC();
-  const resumesQuery = useQuery(trpc.resumes.getMany.queryOptions());
-  const resumes = resumesQuery.data ?? [];
-
   const form = useForm<ApplicationFormValues>({
     resolver: zodResolver(applicationFormSchema),
     defaultValues: {
@@ -62,7 +58,6 @@ export function ApplicationForm({
       appliedAt: initial?.appliedAt ?? null,
       jobDescription: initial?.jobDescription ?? "",
       notes: initial?.notes ?? "",
-      baseResumeId: initial?.baseResumeId ?? null,
     },
   });
 
@@ -72,10 +67,13 @@ export function ApplicationForm({
     value,
     label: config.label,
   }));
-  const resumeItems = resumes.map((resume) => ({ value: resume.id, label: resume.title }));
 
   return (
-    <form id="application-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
+    <form
+      id="application-form"
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="flex flex-col gap-6"
+    >
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Controller
@@ -106,7 +104,13 @@ export function ApplicationForm({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid} className="sm:col-span-2">
                 <FieldLabel htmlFor="url">Job posting URL</FieldLabel>
-                <Input {...field} id="url" type="url" value={field.value ?? ""} placeholder="https://..." />
+                <Input
+                  {...field}
+                  id="url"
+                  type="url"
+                  value={field.value ?? ""}
+                  placeholder="https://..."
+                />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
@@ -204,7 +208,12 @@ export function ApplicationForm({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="location">Location</FieldLabel>
-                <Input {...field} id="location" value={field.value ?? ""} placeholder="Remote / San Francisco, CA" />
+                <Input
+                  {...field}
+                  id="location"
+                  value={field.value ?? ""}
+                  placeholder="God bless a remote position"
+                />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
@@ -215,7 +224,12 @@ export function ApplicationForm({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="salary">Salary</FieldLabel>
-                <Input {...field} id="salary" value={field.value ?? ""} placeholder="$150k - $180k" />
+                <Input
+                  {...field}
+                  id="salary"
+                  value={field.value ?? ""}
+                  placeholder="What would you expect"
+                />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
@@ -223,67 +237,23 @@ export function ApplicationForm({
         </div>
       </div>
 
-      <Collapsible className="flex flex-col gap-4">
-        <CollapsibleTrigger
-          render={<Button variant="outline" size="sm" className="w-full text-muted-foreground" />}
-        >
-          <ChevronDown className="size-4" />
-          Advanced details
-        </CollapsibleTrigger>
-        <CollapsibleContent className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Controller
-              name="baseResumeId"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="base-resume">Base resume</FieldLabel>
-                  {resumesQuery.isLoading ? (
-                    <Skeleton className="h-8 w-full" />
-                  ) : (
-                    <Select
-                      name={field.name}
-                      value={field.value ?? "none"}
-                      onValueChange={(v) => field.onChange(v === "none" ? null : v)}
-                      items={resumeItems}
-                    >
-                      <SelectTrigger id="base-resume" className="w-full">
-                        <SelectValue placeholder="None selected" />
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        <SelectItem value="none">None selected</SelectItem>
-                        {resumeItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
+      <Controller
+        name="notes"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor="notes">Notes</FieldLabel>
+            <Textarea
+              {...field}
+              id="notes"
+              value={field.value ?? ""}
+              placeholder="Recruiter contact, referral details, interview notes..."
+              rows={4}
             />
-          </div>
-          <Controller
-            name="notes"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="notes">Notes</FieldLabel>
-                <Textarea
-                  {...field}
-                  id="notes"
-                  value={field.value ?? ""}
-                  placeholder="Recruiter contact, referral details, interview notes..."
-                  rows={4}
-                />
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
-        </CollapsibleContent>
-      </Collapsible>
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
       <div className="flex items-center justify-end gap-2">
         <Link href="/applications" className={buttonVariants({ variant: "ghost" })}>
