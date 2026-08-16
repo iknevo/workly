@@ -3,62 +3,30 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EyeOff, Loader2, Mail, RefreshCw, Undo2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+import {
+  EmailPreviewDrawer,
+  type MailEmail,
+  type MailSearchData,
+  mailInitials,
+} from "@/modules/mail/ui/email-preview";
 import { TagsEditor } from "@/modules/profile/ui/editors";
 import { useTRPC } from "@/trpc/client";
-
-type SearchConfig = {
-  company: string;
-  keywords: string[];
-  emails: Array<{
-    id: string;
-    subject: string | null;
-    fromEmail: string | null;
-    toEmail: string | null;
-    senderEmail: string | null;
-    snippet: string | null;
-    bodyText: string | null;
-    internalDate: Date | null;
-    relevanceScore: number | null;
-    matchReasons: string[] | null;
-    isHidden: boolean;
-  }>;
-};
-
-type Email = SearchConfig["emails"][number];
-
-function initials(from: string | null): string {
-  if (!from) return "?";
-  const name = from.split("<")[0].trim();
-  const local = from.match(/<([^>]+)>/)?.[1] ?? name;
-  const base = name || local;
-  const parts = base.split(/[\s@.]+/).filter(Boolean);
-  const first = parts[0]?.[0] ?? "";
-  const second = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
-  return (first + second).toUpperCase() || "?";
-}
 
 export function EmailsTab({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<MailEmail | null>(null);
 
   const accountsQuery = useQuery(trpc.mail.getAccounts.queryOptions());
   const emailsQuery = useQuery(trpc.mail.getForApplication.queryOptions({ applicationId }));
@@ -77,18 +45,35 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
 
   const getForApplicationKey = trpc.mail.getForApplication.queryKey({ applicationId });
 
-  const patchEmail = (emailId: string, patch: Partial<SearchConfig["emails"][number]>) => {
-    queryClient.setQueryData<SearchConfig>(getForApplicationKey, (old) =>
-      old
-        ? {
-            ...old,
-            emails: old.emails.map((email) =>
-              email.id === emailId ? { ...email, ...patch } : email
-            ),
-          }
-        : old
-    );
-  };
+  const patchEmail = useCallback(
+    (emailId: string, patch: Partial<MailEmail>) => {
+      queryClient.setQueryData<MailSearchData>(getForApplicationKey, (old) =>
+        old
+          ? {
+              ...old,
+              emails: old.emails.map((email) =>
+                email.id === emailId ? { ...email, ...patch } : email
+              ),
+            }
+          : old
+      );
+    },
+    [queryClient, getForApplicationKey]
+  );
+
+  const markRead = useMutation(trpc.mail.markRead.mutationOptions({}));
+  const lastReadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedEmail || selectedEmail.isRead || lastReadRef.current === selectedEmail.id) return;
+    lastReadRef.current = selectedEmail.id;
+    patchEmail(selectedEmail.id, { isRead: true });
+    markRead.mutate({ emailId: selectedEmail.id });
+  }, [selectedEmail, markRead, patchEmail]);
+
+  const currentIndex = selectedEmail
+    ? visibleEmails.findIndex((email) => email.id === selectedEmail.id)
+    : -1;
 
   const sync = useMutation(
     trpc.mail.sync.mutationOptions({
@@ -108,6 +93,8 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
     })
   );
 
+  const [autoSyncing, setAutoSyncing] = useState(false);
+
   const updateKeywords = useMutation(
     trpc.mail.updateKeywords.mutationOptions({
       onSuccess: (result) => {
@@ -119,6 +106,15 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
             result.removedCount > 0 ? `, ${result.removedCount} no longer match` : ""
           }.`,
         });
+        if (result.needsSync && !autoSyncing && !sync.isPending) {
+          setAutoSyncing(true);
+          sync.mutate(
+            { applicationId },
+            {
+              onSettled: () => setAutoSyncing(false),
+            }
+          );
+        }
       },
       onError: (error) => {
         toast.add({ type: "error", title: "Could not save keywords", description: error.message });
@@ -221,25 +217,39 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRematch}
-            disabled={busy}
-            title="Clear and re-run the smart matcher"
-          >
-            <RefreshCw className={rematch.isPending ? "animate-spin" : ""} />
-            Re-match
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => sync.mutate({ applicationId })}
-            disabled={busy}
-          >
-            <RefreshCw className={sync.isPending ? "animate-spin" : ""} />
-            Sync
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button variant="outline" size="sm" onClick={handleRematch} disabled={busy} />
+              }
+            >
+              <RefreshCw className={rematch.isPending ? "animate-spin" : ""} />
+              Re-match
+            </TooltipTrigger>
+            <TooltipContent>
+              Reset and re-run the matcher from scratch. Clears all current matches (including
+              hidden ones) and re-scans your inbox against the current keywords.
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sync.mutate({ applicationId })}
+                  disabled={busy}
+                />
+              }
+            >
+              <RefreshCw className={sync.isPending ? "animate-spin" : ""} />
+              Sync
+            </TooltipTrigger>
+            <TooltipContent>
+              Scan your inbox for new emails matching this application. Adds new matches and
+              removes ones that no longer match, without clearing your current matches.
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -253,7 +263,7 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                 {keyword}
               </Badge>
             ))}
-            {updateKeywords.isPending && (
+            {(updateKeywords.isPending || autoSyncing) && (
               <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
             )}
           </div>
@@ -262,7 +272,7 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
             onChange={handleKeywordsChange}
             placeholder="e.g. acme.com, recruiter"
             addLabel="Add keyword"
-            disabled={busy}
+            disabled={updateKeywords.isPending}
           />
         </CardContent>
       </Card>
@@ -296,14 +306,21 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                   setSelectedEmail(email);
                 }
               }}
-              className="group flex min-w-0 w-full cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex w-full min-w-0 cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                {initials(email.fromEmail)}
+                {mailInitials(email.fromEmail)}
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">
-                  {email.subject || "(no subject)"}
+                <span className="flex items-center gap-2">
+                  {!email.isRead && (
+                    <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+                  )}
+                  <span
+                    className={`truncate ${email.isRead ? "font-medium text-muted-foreground" : "font-semibold"}`}
+                  >
+                    {email.subject || "(no subject)"}
+                  </span>
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
                   {email.fromEmail}
@@ -311,17 +328,12 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-1.5">
-                {email.relevanceScore != null && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    {email.relevanceScore}
-                  </span>
-                )}
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    hideEmail.mutate({ emailId: email.id });
+                    hideEmail.mutate({ emailId: email.id, applicationId });
                   }}
                   title="Hide email"
                   className="opacity-0 group-hover:opacity-100 max-sm:opacity-100"
@@ -354,10 +366,10 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                     setSelectedEmail(email);
                   }
                 }}
-                className="group flex min-w-0 w-full cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex w-full min-w-0 cursor-pointer items-center gap-3 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
-                  {initials(email.fromEmail)}
+                  {mailInitials(email.fromEmail)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm">{email.subject || "(no subject)"}</span>
@@ -371,7 +383,7 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    unhideEmail.mutate({ emailId: email.id });
+                    unhideEmail.mutate({ emailId: email.id, applicationId });
                   }}
                   className="shrink-0 text-muted-foreground"
                 >
@@ -384,136 +396,30 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
         </Collapsible>
       )}
 
-      <Sheet
-        open={!!selectedEmail}
+      <EmailPreviewDrawer
+        email={selectedEmail}
+        applicationId={applicationId}
         onOpenChange={(open) => {
           if (!open) setSelectedEmail(null);
         }}
-      >
-        <SheetContent side="right" className="w-full sm:max-w-lg">
-          {selectedEmail && (
-            <EmailDetail
-              email={selectedEmail}
-              applicationId={applicationId}
-              pending={hideEmail.isPending || unhideEmail.isPending}
-              onHide={() => {
-                hideEmail.mutate({ emailId: selectedEmail.id });
-                setSelectedEmail(null);
-              }}
-              onRestore={() => {
-                unhideEmail.mutate({ emailId: selectedEmail.id });
-                setSelectedEmail(null);
-              }}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
+        onPrev={currentIndex > 0 ? () => setSelectedEmail(visibleEmails[currentIndex - 1]) : null}
+        onNext={
+          currentIndex >= 0 && currentIndex < visibleEmails.length - 1
+            ? () => setSelectedEmail(visibleEmails[currentIndex + 1])
+            : null
+        }
+        pending={hideEmail.isPending || unhideEmail.isPending}
+        onHide={() => {
+          if (!selectedEmail) return;
+          hideEmail.mutate({ emailId: selectedEmail.id, applicationId });
+          setSelectedEmail(null);
+        }}
+        onRestore={() => {
+          if (!selectedEmail) return;
+          unhideEmail.mutate({ emailId: selectedEmail.id, applicationId });
+          setSelectedEmail(null);
+        }}
+      />
     </div>
-  );
-}
-
-function EmailDetail({
-  email,
-  applicationId,
-  pending,
-  onHide,
-  onRestore,
-}: {
-  email: Email;
-  applicationId: string;
-  pending: boolean;
-  onHide: () => void;
-  onRestore: () => void;
-}) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const getForApplicationKey = trpc.mail.getForApplication.queryKey({ applicationId });
-
-  const bodyQuery = useQuery({
-    ...trpc.mail.getEmail.queryOptions({ emailId: email.id }),
-    enabled: !email.bodyText,
-  });
-
-  useEffect(() => {
-    if (bodyQuery.data?.bodyText && !email.bodyText) {
-      queryClient.setQueryData<SearchConfig>(getForApplicationKey, (old) =>
-        old
-          ? {
-              ...old,
-              emails: old.emails.map((row) =>
-                row.id === email.id ? { ...row, bodyText: bodyQuery.data?.bodyText ?? null } : row
-              ),
-            }
-          : old
-      );
-    }
-  }, [bodyQuery.data, email.id, email.bodyText, getForApplicationKey, queryClient]);
-
-  const body =
-    email.bodyText ??
-    bodyQuery.data?.bodyText ??
-    (bodyQuery.isFetching ? "" : (email.snippet ?? ""));
-
-  return (
-    <>
-      <SheetHeader>
-        <SheetTitle className="break-words">{email.subject || "(no subject)"}</SheetTitle>
-        <SheetDescription className="break-words">
-          {email.fromEmail}
-          {email.toEmail ? ` → ${email.toEmail}` : ""}
-          {email.internalDate ? ` · ${email.internalDate.toLocaleString()}` : ""}
-        </SheetDescription>
-      </SheetHeader>
-
-      {email.matchReasons && email.matchReasons.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-4">
-          {email.matchReasons.map((reason) => (
-            <span
-              key={reason}
-              className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-            >
-              {reason}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="min-w-0 flex-1 overflow-y-auto border-t px-4 py-3">
-        {bodyQuery.isFetching && !email.bodyText ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/6" />
-          </div>
-        ) : body ? (
-          <p className="whitespace-pre-wrap break-words text-sm">{body}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {bodyQuery.isError
-              ? "Could not fetch the full email body. Reconnect your account and sync to refresh it."
-              : "This email has no readable body."}
-          </p>
-        )}
-      </div>
-
-      <SheetFooter>
-        {email.isHidden ? (
-          <Button variant="ghost" onClick={onRestore} disabled={pending}>
-            <Undo2 />
-            Restore
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            onClick={onHide}
-            disabled={pending}
-            className="text-muted-foreground"
-          >
-            <EyeOff />
-            Hide
-          </Button>
-        )}
-      </SheetFooter>
-    </>
   );
 }

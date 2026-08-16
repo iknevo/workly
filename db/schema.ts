@@ -283,8 +283,8 @@ export const emails = pgTable(
   "emails",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    applicationId: uuid("application_id")
-      .references(() => applications.id, { onDelete: "cascade" })
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
     mailAccountId: uuid("mail_account_id")
       .references(() => mailAccounts.id, { onDelete: "cascade" })
@@ -297,17 +297,36 @@ export const emails = pgTable(
     senderEmail: text("sender_email"),
     snippet: text("snippet"),
     bodyText: text("body_text"),
-    relevanceScore: integer("relevance_score"),
-    matchReasons: text("match_reasons").array(),
-    isHidden: boolean("is_hidden").default(false).notNull(),
     internalDate: timestamp("internal_date"),
     isRead: boolean("is_read").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (d) => [
-    index("emails_application_id_idx").on(d.applicationId),
+    index("emails_user_id_idx").on(d.userId),
     uniqueIndex("emails_mail_account_message_idx").on(d.mailAccountId, d.messageUid),
+  ]
+);
+
+export const emailApplications = pgTable(
+  "email_applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    emailId: uuid("email_id")
+      .references(() => emails.id, { onDelete: "cascade" })
+      .notNull(),
+    applicationId: uuid("application_id")
+      .references(() => applications.id, { onDelete: "cascade" })
+      .notNull(),
+    relevanceScore: integer("relevance_score"),
+    matchReasons: text("match_reasons").array(),
+    isHidden: boolean("is_hidden").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (d) => [
+    index("email_applications_application_id_idx").on(d.applicationId),
+    uniqueIndex("email_applications_email_application_idx").on(d.emailId, d.applicationId),
   ]
 );
 
@@ -320,9 +339,11 @@ export const relations = defineRelations(
     events,
     mailAccounts,
     emails,
+    emailApplications,
   },
   (r) => ({
-    users: {      resumes: r.many.resumes({
+    users: {
+      resumes: r.many.resumes({
         from: r.users.id,
         to: r.resumes.userId,
       }),
@@ -337,6 +358,10 @@ export const relations = defineRelations(
       mailAccounts: r.many.mailAccounts({
         from: r.users.id,
         to: r.mailAccounts.userId,
+      }),
+      emails: r.many.emails({
+        from: r.users.id,
+        to: r.emails.userId,
       }),
     },
     resumes: {
@@ -370,9 +395,9 @@ export const relations = defineRelations(
         from: r.applications.id,
         to: r.events.applicationId,
       }),
-      emails: r.many.emails({
+      emailApplications: r.many.emailApplications({
         from: r.applications.id,
-        to: r.emails.applicationId,
+        to: r.emailApplications.applicationId,
       }),
     },
     applicationResumes: {
@@ -406,13 +431,27 @@ export const relations = defineRelations(
       }),
     },
     emails: {
-      application: r.one.applications({
-        from: r.emails.applicationId,
-        to: r.applications.id,
+      user: r.one.users({
+        from: r.emails.userId,
+        to: r.users.id,
       }),
       mailAccount: r.one.mailAccounts({
         from: r.emails.mailAccountId,
         to: r.mailAccounts.id,
+      }),
+      emailApplications: r.many.emailApplications({
+        from: r.emails.id,
+        to: r.emailApplications.emailId,
+      }),
+    },
+    emailApplications: {
+      email: r.one.emails({
+        from: r.emailApplications.emailId,
+        to: r.emails.id,
+      }),
+      application: r.one.applications({
+        from: r.emailApplications.applicationId,
+        to: r.applications.id,
       }),
     },
   })
@@ -463,3 +502,6 @@ export const selectMailAccountSchema = createSelectSchema(mailAccounts);
 export const insertEmailSchema = createInsertSchema(emails);
 export const updateEmailSchema = createUpdateSchema(emails);
 export const selectEmailSchema = createSelectSchema(emails);
+
+export const insertEmailApplicationSchema = createInsertSchema(emailApplications);
+export const selectEmailApplicationSchema = createSelectSchema(emailApplications);

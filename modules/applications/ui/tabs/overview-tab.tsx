@@ -41,7 +41,7 @@ export function OverviewTab({ application }: { application: Application }) {
   async function handleDelete() {
     const ok = await confirm({
       title: "Delete application",
-      message: `Permanently delete ${application.company} · ${application.position}? Its events, emails, and generated resumes will be removed too.`,
+      message: `Permanently delete ${application.company} · ${application.position}? Its events and generated resumes will be removed; matched emails are unlinked but stay stored.`,
     });
     if (ok) remove.mutate({ id: application.id });
   }

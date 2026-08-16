@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { env } from "@/config/env";
 import { db } from "@/db";
-import { applications, emails, mailAccounts } from "@/db/schema";
+import { applications, emailApplications, emails, mailAccounts } from "@/db/schema";
 import {
   buildImapSearchQueries,
   companyPhrase,
@@ -80,7 +80,7 @@ async function performSync(userId: string, applicationId: string) {
     keywords,
   };
 
-  const inserted: typeof emails.$inferSelect[] = [];
+  let insertedCount = 0;
   let removedCount = 0;
 
   for (const account of accounts) {
@@ -110,37 +110,91 @@ async function performSync(userId: string, applicationId: string) {
       let totalListed = 0;
 
       for (const query of queries) {
-        let evaluatedThisQuery = 0;
+        let fetchedThisQuery = 0;
 
         const uids = await session.search(query as SearchObject);
         totalListed += uids.length;
         if (totalListed > TOTAL_LIST_CAP) uids.length = Math.max(0, TOTAL_LIST_CAP - (totalListed - uids.length));
 
-        const knownRows =
+        const existingRows =
           uids.length > 0
             ? await db
-                .select({ messageUid: emails.messageUid })
+                .select({
+                  id: emails.id,
+                  messageUid: emails.messageUid,
+                  fromEmail: emails.fromEmail,
+                  subject: emails.subject,
+                  snippet: emails.snippet,
+                })
                 .from(emails)
                 .where(
                   and(eq(emails.mailAccountId, account.id), inArray(emails.messageUid, uids))
                 )
             : [];
-        const known = new Set(knownRows.map((r) => r.messageUid));
+        const byUid = new Map(existingRows.map((r) => [r.messageUid, r]));
 
         for (const uid of uids) {
-          if (evaluatedThisQuery >= PER_QUERY_EVAL_BUDGET) break;
-          if (processed.has(uid) || known.has(uid)) continue;
+          if (processed.has(uid)) continue;
           processed.add(uid);
-          evaluatedThisQuery += 1;
 
-          const fetched = await session.fetch(uid);
-          if (!fetched) continue;
-          if (isJunkLabels(fetched.labels)) continue;
+          let existing = byUid.get(uid);
+          let from = existing?.fromEmail ?? "";
+          let subject = existing?.subject ?? "";
+          let snippet = existing?.snippet ?? "";
 
-          const from = formatEnvelopeAddress(fetched.envelope.from);
-          const subject = fetched.envelope.subject ?? "";
-          const snippet = await makeSnippet(fetched.source);
-          const bodyText = await parseBodyText(fetched.source);
+          if (!existing) {
+            if (fetchedThisQuery >= PER_QUERY_EVAL_BUDGET) break;
+            fetchedThisQuery += 1;
+
+            const fetched = await session.fetch(uid);
+            if (!fetched) continue;
+            if (isJunkLabels(fetched.labels)) continue;
+
+            from = formatEnvelopeAddress(fetched.envelope.from);
+            subject = fetched.envelope.subject ?? "";
+            snippet = await makeSnippet(fetched.source);
+            const bodyText = await parseBodyText(fetched.source);
+
+            const [email] = await db
+              .insert(emails)
+              .values({
+                userId,
+                mailAccountId: account.id,
+                messageUid: uid,
+                threadId: null,
+                subject: subject || null,
+                fromEmail: from || null,
+                toEmail: formatEnvelopeAddress(fetched.envelope.to) || null,
+                senderEmail: parseEmailAddress(from) || null,
+                snippet: snippet || null,
+                bodyText: bodyText || null,
+                internalDate: fetched.internalDate ?? fetched.envelope.date ?? null,
+                isRead: fetched.flags.has("\\Seen"),
+              })
+              .onConflictDoNothing()
+              .returning({ id: emails.id });
+
+            if (email) {
+              existing = { id: email.id, messageUid: uid, fromEmail: from, subject, snippet };
+            } else {
+              const [row] = await db
+                .select({
+                  id: emails.id,
+                  messageUid: emails.messageUid,
+                  fromEmail: emails.fromEmail,
+                  subject: emails.subject,
+                  snippet: emails.snippet,
+                })
+                .from(emails)
+                .where(
+                  and(eq(emails.mailAccountId, account.id), eq(emails.messageUid, uid))
+                )
+                .limit(1);
+              existing = row ?? undefined;
+            }
+          }
+
+          if (!existing) continue;
 
           const { include, score, reasons } = evaluateEmail({
             from,
@@ -150,28 +204,18 @@ async function performSync(userId: string, applicationId: string) {
           });
           if (!include) continue;
 
-          const [email] = await db
-            .insert(emails)
+          const [link] = await db
+            .insert(emailApplications)
             .values({
+              emailId: existing.id,
               applicationId: application.id,
-              mailAccountId: account.id,
-              messageUid: uid,
-              threadId: null,
-              subject: subject || null,
-              fromEmail: from || null,
-              toEmail: formatEnvelopeAddress(fetched.envelope.to) || null,
-              senderEmail: parseEmailAddress(from) || null,
-              snippet: snippet || null,
-              bodyText: bodyText || null,
               relevanceScore: score,
               matchReasons: reasons,
-              internalDate: fetched.internalDate ?? fetched.envelope.date ?? null,
-              isRead: fetched.flags.has("\\Seen"),
             })
             .onConflictDoNothing()
-            .returning();
+            .returning({ id: emailApplications.id });
 
-          if (email) inserted.push(email);
+          if (link) insertedCount += 1;
         }
       }
     } catch (err) {
@@ -182,7 +226,47 @@ async function performSync(userId: string, applicationId: string) {
     }
   }
 
-  const existing = await db
+  const links = await db
+    .select({
+      id: emailApplications.id,
+      fromEmail: emails.fromEmail,
+      subject: emails.subject,
+      snippet: emails.snippet,
+    })
+    .from(emailApplications)
+    .innerJoin(emails, eq(emailApplications.emailId, emails.id))
+    .where(eq(emailApplications.applicationId, applicationId));
+
+  const stale: string[] = [];
+  for (const link of links) {
+    const { include } = evaluateEmail({
+      from: link.fromEmail ?? "",
+      subject: link.subject ?? "",
+      snippet: link.snippet ?? "",
+      context,
+    });
+    if (!include) stale.push(link.id);
+  }
+
+  if (stale.length > 0) {
+    const deleted = await db
+      .delete(emailApplications)
+      .where(inArray(emailApplications.id, stale))
+      .returning({ id: emailApplications.id });
+    removedCount = deleted.length;
+  }
+
+  return { insertedCount, removedCount };
+}
+
+const LINK_CHUNK_SIZE = 500;
+
+async function reevaluateStoredEmails(
+  userId: string,
+  applicationId: string,
+  context: ScoreContext
+) {
+  const stored = await db
     .select({
       id: emails.id,
       fromEmail: emails.fromEmail,
@@ -190,28 +274,68 @@ async function performSync(userId: string, applicationId: string) {
       snippet: emails.snippet,
     })
     .from(emails)
-    .where(eq(emails.applicationId, applicationId));
+    .where(eq(emails.userId, userId));
 
-  const stale: string[] = [];
-  for (const email of existing) {
-    const { include } = evaluateEmail({
-      from: email.fromEmail ?? "",
-      subject: email.subject ?? "",
-      snippet: email.snippet ?? "",
+  const links = await db
+    .select({ id: emailApplications.id, emailId: emailApplications.emailId })
+    .from(emailApplications)
+    .where(eq(emailApplications.applicationId, applicationId));
+
+  const linkByEmailId = new Map(links.map((link) => [link.emailId, link]));
+  const keepLinkIds = new Set<string>();
+
+  const inserts: {
+    emailId: string;
+    applicationId: string;
+    relevanceScore: number;
+    matchReasons: string[];
+  }[] = [];
+
+  for (const row of stored) {
+    const { include, score, reasons } = evaluateEmail({
+      from: row.fromEmail ?? "",
+      subject: row.subject ?? "",
+      snippet: row.snippet ?? "",
       context,
     });
-    if (!include) stale.push(email.id);
+    if (!include) continue;
+
+    const link = linkByEmailId.get(row.id);
+    if (link) {
+      keepLinkIds.add(link.id);
+    } else {
+      inserts.push({
+        emailId: row.id,
+        applicationId,
+        relevanceScore: score,
+        matchReasons: reasons,
+      });
+    }
   }
 
-  if (stale.length > 0) {
+  let insertedCount = 0;
+  for (let i = 0; i < inserts.length; i += LINK_CHUNK_SIZE) {
+    const chunk = inserts.slice(i, i + LINK_CHUNK_SIZE);
+    const created = await db
+      .insert(emailApplications)
+      .values(chunk)
+      .onConflictDoNothing()
+      .returning({ id: emailApplications.id });
+    insertedCount += created.length;
+  }
+
+  const staleIds = links.filter((link) => !keepLinkIds.has(link.id)).map((link) => link.id);
+  let removedCount = 0;
+  for (let i = 0; i < staleIds.length; i += LINK_CHUNK_SIZE) {
+    const chunk = staleIds.slice(i, i + LINK_CHUNK_SIZE);
     const deleted = await db
-      .delete(emails)
-      .where(inArray(emails.id, stale))
-      .returning({ id: emails.id });
-    removedCount = deleted.length;
+      .delete(emailApplications)
+      .where(inArray(emailApplications.id, chunk))
+      .returning({ id: emailApplications.id });
+    removedCount += deleted.length;
   }
 
-  return { insertedCount: inserted.length, removedCount };
+  return { insertedCount, removedCount };
 }
 
 export const mailRouter = createTRPCRouter({
@@ -326,9 +450,26 @@ export const mailRouter = createTRPCRouter({
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
       const emailRows = await db
-        .select()
-        .from(emails)
-        .where(eq(emails.applicationId, input.applicationId))
+        .select({
+          id: emails.id,
+          mailAccountId: emails.mailAccountId,
+          messageUid: emails.messageUid,
+          threadId: emails.threadId,
+          subject: emails.subject,
+          fromEmail: emails.fromEmail,
+          toEmail: emails.toEmail,
+          senderEmail: emails.senderEmail,
+          snippet: emails.snippet,
+          bodyText: emails.bodyText,
+          internalDate: emails.internalDate,
+          isRead: emails.isRead,
+          relevanceScore: emailApplications.relevanceScore,
+          matchReasons: emailApplications.matchReasons,
+          isHidden: emailApplications.isHidden,
+        })
+        .from(emailApplications)
+        .innerJoin(emails, eq(emailApplications.emailId, emails.id))
+        .where(eq(emailApplications.applicationId, input.applicationId))
         .orderBy(emails.internalDate);
 
       return {
@@ -344,7 +485,7 @@ export const mailRouter = createTRPCRouter({
       const [email] = await db
         .select({
           id: emails.id,
-          applicationId: emails.applicationId,
+          userId: emails.userId,
           messageUid: emails.messageUid,
           bodyText: emails.bodyText,
           account: {
@@ -363,14 +504,7 @@ export const mailRouter = createTRPCRouter({
         .limit(1);
       if (!email) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const [application] = await db
-        .select({ id: applications.id })
-        .from(applications)
-        .where(
-          and(eq(applications.id, email.applicationId), eq(applications.userId, ctx.user.id))
-        )
-        .limit(1);
-      if (!application) throw new TRPCError({ code: "NOT_FOUND" });
+      if (email.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
 
       if (email.bodyText) return { bodyText: email.bodyText };
 
@@ -403,6 +537,18 @@ export const mailRouter = createTRPCRouter({
       }
     }),
 
+  markRead: protectedProcedure
+    .input(z.object({ emailId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await db
+        .update(emails)
+        .set({ isRead: true, updatedAt: new Date() })
+        .where(and(eq(emails.id, input.emailId), eq(emails.userId, ctx.user.id)))
+        .returning({ id: emails.id });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return updated;
+    }),
+
   updateKeywords: protectedProcedure
     .input(z.object({ applicationId: z.string().uuid(), keywords: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
@@ -421,12 +567,15 @@ export const mailRouter = createTRPCRouter({
         .update(applications)
         .set({ mailKeywords: keywords, updatedAt: new Date() })
         .where(and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id)))
-        .returning({ id: applications.id });
+        .returning({ id: applications.id, company: applications.company });
 
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const result = await performSync(ctx.user.id, input.applicationId);
-      return { ...updated, ...result };
+      const result = await reevaluateStoredEmails(ctx.user.id, input.applicationId, {
+        companyPhrase: companyPhrase(updated.company),
+        keywords,
+      });
+      return { ...updated, ...result, needsSync: true };
     }),
 
   sync: protectedProcedure
@@ -445,36 +594,45 @@ export const mailRouter = createTRPCRouter({
         .limit(1);
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
-      await db.delete(emails).where(eq(emails.applicationId, input.applicationId));
+      await db.delete(emailApplications).where(eq(emailApplications.applicationId, input.applicationId));
       return performSync(ctx.user.id, input.applicationId);
     }),
 
   hideEmail: protectedProcedure
-    .input(z.object({ emailId: z.string().uuid() }))
+    .input(z.object({ emailId: z.string().uuid(), applicationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [email] = await db
-        .select({
-          id: emails.id,
-          applicationId: emails.applicationId,
-          senderEmail: emails.senderEmail,
-        })
-        .from(emails)
-        .where(eq(emails.id, input.emailId))
-        .limit(1);
-      if (!email) throw new TRPCError({ code: "NOT_FOUND" });
-
       const [application] = await db
         .select({ id: applications.id, mailExclusions: applications.mailExclusions })
         .from(applications)
         .where(
-          and(eq(applications.id, email.applicationId), eq(applications.userId, ctx.user.id))
+          and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id))
         )
         .limit(1);
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
-      await db.update(emails).set({ isHidden: true }).where(eq(emails.id, email.id));
+      const [link] = await db
+        .select({
+          id: emailApplications.id,
+          emailId: emailApplications.emailId,
+          senderEmail: emails.senderEmail,
+        })
+        .from(emailApplications)
+        .innerJoin(emails, eq(emailApplications.emailId, emails.id))
+        .where(
+          and(
+            eq(emailApplications.emailId, input.emailId),
+            eq(emailApplications.applicationId, input.applicationId)
+          )
+        )
+        .limit(1);
+      if (!link) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const senderEmail = email.senderEmail?.trim().toLowerCase();
+      await db
+        .update(emailApplications)
+        .set({ isHidden: true, updatedAt: new Date() })
+        .where(eq(emailApplications.id, link.id));
+
+      const senderEmail = link.senderEmail?.trim().toLowerCase();
       if (senderEmail) {
         const exclusions = application.mailExclusions ?? [];
         if (!exclusions.includes(senderEmail)) {
@@ -489,31 +647,40 @@ export const mailRouter = createTRPCRouter({
     }),
 
   unhideEmail: protectedProcedure
-    .input(z.object({ emailId: z.string().uuid() }))
+    .input(z.object({ emailId: z.string().uuid(), applicationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [email] = await db
-        .select({
-          id: emails.id,
-          applicationId: emails.applicationId,
-          senderEmail: emails.senderEmail,
-        })
-        .from(emails)
-        .where(eq(emails.id, input.emailId))
-        .limit(1);
-      if (!email) throw new TRPCError({ code: "NOT_FOUND" });
-
       const [application] = await db
         .select({ id: applications.id, mailExclusions: applications.mailExclusions })
         .from(applications)
         .where(
-          and(eq(applications.id, email.applicationId), eq(applications.userId, ctx.user.id))
+          and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id))
         )
         .limit(1);
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
-      await db.update(emails).set({ isHidden: false }).where(eq(emails.id, email.id));
+      const [link] = await db
+        .select({
+          id: emailApplications.id,
+          emailId: emailApplications.emailId,
+          senderEmail: emails.senderEmail,
+        })
+        .from(emailApplications)
+        .innerJoin(emails, eq(emailApplications.emailId, emails.id))
+        .where(
+          and(
+            eq(emailApplications.emailId, input.emailId),
+            eq(emailApplications.applicationId, input.applicationId)
+          )
+        )
+        .limit(1);
+      if (!link) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const senderEmail = email.senderEmail?.trim().toLowerCase();
+      await db
+        .update(emailApplications)
+        .set({ isHidden: false, updatedAt: new Date() })
+        .where(eq(emailApplications.id, link.id));
+
+      const senderEmail = link.senderEmail?.trim().toLowerCase();
       if (senderEmail) {
         const exclusions = application.mailExclusions ?? [];
         const next = exclusions.filter((e) => e.trim().toLowerCase() !== senderEmail);
