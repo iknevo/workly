@@ -8,7 +8,7 @@ export default async function DashboardPage() {
 
   prefetch(trpc.applications.getMany.queryOptions());
   prefetch(trpc.events.getManyForMonth.queryOptions({ start: startOfMonth(), end: endOfMonth() }));
-  prefetch(trpc.resumes.getMany.queryOptions());
+  prefetch(trpc.users.getMe.queryOptions());
 
   return (
     <HydrateClient>
