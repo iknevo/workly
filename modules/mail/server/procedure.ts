@@ -48,6 +48,9 @@ function friendlyImapError(err: unknown, provider: MailProvider): string {
     lower.includes("invalid credentials") ||
     lower.includes("authentication failed")
   ) {
+    if (provider === "outlook") {
+      return `Sign-in failed for Outlook. Use an app password from account.live.com/proofs/AppPassword (not your normal password) — this requires 2-Step Verification to be enabled. Work or school accounts usually can't use IMAP. Microsoft is phasing out IMAP login for Outlook.com and may reject even valid app passwords — wait 24-48 hours and retry. See: https://support.microsoft.com/en-us/support/known-issues/outlook-and-other-apps-are-unable-to-connect-to-outlook-com-when-using-basic-authentication`;
+    }
     return `Sign-in failed for ${provider}. Check the email and app password, and make sure 2-Step Verification is enabled for the account.`;
   }
   if (

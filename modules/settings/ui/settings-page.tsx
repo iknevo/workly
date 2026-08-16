@@ -51,10 +51,11 @@ const PROVIDER_GUIDES: Record<
     title: "Connect Outlook",
     steps: [
       "Turn on two-step verification at account.microsoft.com/security (required for app passwords).",
-      "Open App passwords and create a new one, naming it Workly.",
-      "Copy the one-time code Microsoft shows.",
-      "Paste that code into the App password field below.",
+      "Open App passwords — Microsoft generates a code immediately, there's no naming step.",
+      "Copy the generated app password (spaces are ignored).",
+      "Paste it into the App password field below.",
       "Note: app passwords only work for personal accounts — work or school accounts usually disable them.",
+      "Still failing? Microsoft is phasing out IMAP for Outlook.com and may reject even valid app passwords (temporary, often clears in 24-48 hours) — see Microsoft's known-issue page.",
     ],
     url: "https://account.live.com/proofs/AppPassword",
     urlLabel: "Open Outlook app passwords",
@@ -128,17 +129,10 @@ export function SettingsPage() {
       provider: provider as "gmail" | "outlook" | "yahoo" | "icloud" | "imap",
       email,
       appPassword,
-      host: provider === "imap" ? host : undefined,
-      port: provider === "imap" && port ? Number(port) : undefined,
+      host: host.trim() || undefined,
+      port: port ? Number(port) : undefined,
     });
   };
-
-  const appPasswordUrl =
-    provider === "gmail"
-      ? "https://myaccount.google.com/apppasswords"
-      : provider === "outlook"
-        ? "https://account.microsoft.com/security/password/app-password"
-        : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -280,7 +274,9 @@ export function SettingsPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="email" className="min-h-5">Email</Label>
+                  <Label htmlFor="email" className="min-h-5">
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -293,20 +289,7 @@ export function SettingsPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="appPassword">
-                  App password
-                  {appPasswordUrl ? (
-                    <a
-                      href={appPasswordUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      Get app password
-                      <ExternalLink className="size-3" />
-                    </a>
-                  ) : null}
-                </Label>
+                <Label htmlFor="appPassword">App password</Label>
                 <Input
                   id="appPassword"
                   type="password"

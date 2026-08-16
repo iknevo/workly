@@ -44,8 +44,8 @@ export function resolveImapConfig(input: {
     provider: input.provider,
     email: input.email.trim().toLowerCase(),
     appPassword: input.appPassword.trim().replace(/\s+/g, ""),
-    host: preset.host,
-    port: preset.port,
+    host: input.host?.trim() || preset.host,
+    port: input.port ?? preset.port,
     folder: preset.folder,
   };
 }
