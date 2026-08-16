@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
-  Sparkles,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -49,11 +48,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" render={<Link href="/dashboard" />} className="gap-2">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" />
-                </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">Workly</span>
+                  <span className="text-xl font-semibold">Workly</span>
                   <span className="text-xs text-muted-foreground">Job application tracker</span>
                 </div>
               </SidebarMenuButton>
@@ -86,7 +82,43 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <div className="flex flex-1 items-center justify-end gap-2">
-            <UserButton />
+            <UserButton>
+              <UserButton.MenuItems>
+                <UserButton.Link
+                  label="Dashboard"
+                  href="/dashboard"
+                  labelIcon={<LayoutDashboard className="size-4" />}
+                />
+                <UserButton.Link
+                  label="Applications"
+                  href="/applications"
+                  labelIcon={<ListChecks className="size-4" />}
+                />
+                <UserButton.Link
+                  label="Resumes"
+                  href="/resumes"
+                  labelIcon={<FileText className="size-4" />}
+                />
+                <UserButton.Link
+                  label="Calendar"
+                  href="/calendar"
+                  labelIcon={<CalendarDays className="size-4" />}
+                />
+                <UserButton.Link
+                  label="My profile"
+                  href="/profile"
+                  labelIcon={<UserRound className="size-4" />}
+                />
+
+                <UserButton.Link
+                  label="Settings"
+                  href="/settings"
+                  labelIcon={<Settings className="size-4" />}
+                />
+
+                <UserButton.Action label="manageAccount" />
+              </UserButton.MenuItems>
+            </UserButton>
           </div>
         </header>
         <main className="flex flex-1 flex-col gap-4 overflow-x-clip p-4 md:p-6">{children}</main>
