@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
@@ -10,8 +9,7 @@ export default async function ResumeViewRoute({
 }: {
   params: Promise<{ resumeId: string }>;
 }) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  await auth.protect();
 
   const { resumeId } = await params;
 

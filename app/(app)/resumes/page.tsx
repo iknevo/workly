@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
@@ -6,8 +5,7 @@ import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 import { ResumesPage } from "@/modules/resumes/ui/resumes-page";
 
 export default async function ResumesRoute() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  await auth.protect();
 
   prefetch(trpc.resumes.getMany.queryOptions());
 

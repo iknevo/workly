@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
@@ -6,8 +5,7 @@ import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 import { CalendarPage } from "@/modules/events/ui/calendar-page";
 
 export default async function CalendarRoute() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  await auth.protect();
 
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
