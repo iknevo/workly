@@ -213,7 +213,7 @@ export function SettingsPage() {
             <form onSubmit={onSubmit} className="flex flex-col gap-4 border-t pt-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="provider">
+                  <Label htmlFor="provider" className="min-h-5">
                     Provider
                     <Popover>
                       <PopoverTrigger
@@ -280,7 +280,7 @@ export function SettingsPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="min-h-5">Email</Label>
                   <Input
                     id="email"
                     type="email"
