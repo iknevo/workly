@@ -6,7 +6,7 @@ import {
 } from "imapflow";
 import { simpleParser } from "mailparser";
 
-export type MailProvider = "gmail" | "outlook" | "yahoo" | "icloud" | "imap";
+export type MailProvider = "gmail" | "yahoo" | "icloud" | "imap";
 
 export type ImapAccountConfig = {
   provider: MailProvider;
@@ -22,7 +22,6 @@ export const MAIL_PROVIDERS: Record<
   { host: string; port: number; folder: string }
 > = {
   gmail: { host: "imap.gmail.com", port: 993, folder: "[Gmail]/All Mail" },
-  outlook: { host: "outlook.office365.com", port: 993, folder: "INBOX" },
   yahoo: { host: "imap.mail.yahoo.com", port: 993, folder: "INBOX" },
   icloud: { host: "imap.mail.me.com", port: 993, folder: "INBOX" },
 };

@@ -42,17 +42,9 @@ function friendlyImapError(err: unknown, provider: MailProvider): string {
   const responseText = error?.responseText ?? "";
   const lower = `${message} ${responseText}`.toLowerCase();
 
-  if (
-    error?.authenticationFailed ||
-    error?.serverResponseCode === "AUTHENTICATIONFAILED" ||
-    lower.includes("invalid credentials") ||
-    lower.includes("authentication failed")
-  ) {
-    if (provider === "outlook") {
-      return `Sign-in failed for Outlook. Use an app password from account.live.com/proofs/AppPassword (not your normal password) — this requires 2-Step Verification to be enabled. Work or school accounts usually can't use IMAP. Microsoft is phasing out IMAP login for Outlook.com and may reject even valid app passwords — wait 24-48 hours and retry. See: https://support.microsoft.com/en-us/support/known-issues/outlook-and-other-apps-are-unable-to-connect-to-outlook-com-when-using-basic-authentication`;
+    if (error?.authenticationFailed || error?.serverResponseCode === "AUTHENTICATIONFAILED" || lower.includes("invalid credentials") || lower.includes("authentication failed")) {
+      return `Sign-in failed for ${provider}. Check the email and app password, and make sure 2-Step Verification is enabled for the account.`;
     }
-    return `Sign-in failed for ${provider}. Check the email and app password, and make sure 2-Step Verification is enabled for the account.`;
-  }
   if (
     lower.includes("imap") &&
     (lower.includes("disabled") || lower.includes("not enabled") || lower.includes("permission"))
@@ -351,7 +343,7 @@ export const mailRouter = createTRPCRouter({
       z.object({
         email: z.string().email(),
         appPassword: z.string().min(1, "App password is required"),
-        provider: z.enum(["gmail", "outlook", "yahoo", "icloud", "imap"]),
+        provider: z.enum(["gmail", "yahoo", "icloud", "imap"]),
         host: z.string().trim().optional(),
         port: z.number().int().min(1).max(65535).optional(),
       })

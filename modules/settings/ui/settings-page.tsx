@@ -25,7 +25,6 @@ import { useTRPC } from "@/trpc/client";
 
 const PROVIDER_LABELS: Record<string, string> = {
   gmail: "Gmail",
-  outlook: "Outlook",
   yahoo: "Yahoo",
   icloud: "iCloud",
   imap: "Custom IMAP",
@@ -40,25 +39,12 @@ const PROVIDER_GUIDES: Record<
     steps: [
       "Turn on 2-Step Verification at myaccount.google.com/security.",
       "Go to myaccount.google.com/apppasswords (you may need to sign in again).",
-      'Under "Select app", pick Mail — or "Other (custom name)" and type Workly.',
+      'Under "Select app", pick Mail, or "Other (custom name)" and type Workly.',
       "Click Generate. Google shows a 16-character code.",
       "Paste that code into the App password field below.",
     ],
     url: "https://myaccount.google.com/apppasswords",
     urlLabel: "Open Gmail app passwords",
-  },
-  outlook: {
-    title: "Connect Outlook",
-    steps: [
-      "Turn on two-step verification at account.microsoft.com/security (required for app passwords).",
-      "Open App passwords — Microsoft generates a code immediately, there's no naming step.",
-      "Copy the generated app password (spaces are ignored).",
-      "Paste it into the App password field below.",
-      "Note: app passwords only work for personal accounts — work or school accounts usually disable them.",
-      "Still failing? Microsoft is phasing out IMAP for Outlook.com and may reject even valid app passwords (temporary, often clears in 24-48 hours) — see Microsoft's known-issue page.",
-    ],
-    url: "https://account.live.com/proofs/AppPassword",
-    urlLabel: "Open Outlook app passwords",
   },
   imap: {
     title: "Connect Custom IMAP",
@@ -126,7 +112,7 @@ export function SettingsPage() {
     e.preventDefault();
     if (!email || !appPassword) return;
     connect.mutate({
-      provider: provider as "gmail" | "outlook" | "yahoo" | "icloud" | "imap",
+      provider: provider as "gmail" | "yahoo" | "icloud" | "imap",
       email,
       appPassword,
       host: host.trim() || undefined,
@@ -218,7 +204,7 @@ export function SettingsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="max-h-[70vh] w-80 overflow-auto sm:w-96">
                         <div className="flex flex-wrap items-center gap-1">
-                          {(["gmail", "outlook", "imap"] as const).map((key) => (
+                          {(["gmail", "imap"] as const).map((key) => (
                             <button
                               key={key}
                               type="button"
@@ -267,7 +253,6 @@ export function SettingsPage() {
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
                       <SelectItem value="gmail">Gmail</SelectItem>
-                      <SelectItem value="outlook">Outlook</SelectItem>
                       <SelectItem value="imap">Custom IMAP</SelectItem>
                     </SelectContent>
                   </Select>
