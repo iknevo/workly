@@ -130,9 +130,7 @@ function AddEventSheet({ applicationId }: { applicationId: string }) {
           <SheetTitle>Add event</SheetTitle>
           <SheetDescription>Add a date to this application&apos;s timeline.</SheetDescription>
         </SheetHeader>
-        <div className="px-4 pb-4">
-          <EventFormDialog applicationId={applicationId} onClose={() => setOpen(false)} />
-        </div>
+        <EventFormDialog applicationId={applicationId} onClose={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   );

@@ -8,6 +8,12 @@
         "@ai-sdk/groq": "^4.0.26",
         "@base-ui/react": "^1.7.0",
         "@clerk/nextjs": "^7.7.1",
+        "@fullcalendar/core": "6.1.21",
+        "@fullcalendar/daygrid": "6.1.21",
+        "@fullcalendar/interaction": "6.1.21",
+        "@fullcalendar/list": "6.1.21",
+        "@fullcalendar/react": "6.1.21",
+        "@fullcalendar/timegrid": "6.1.21",
         "@hookform/resolvers": "^5.7.1",
         "@neondatabase/serverless": "^1.1.0",
         "@shadcn/react": "^0.3.0",
@@ -242,6 +248,18 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.9", "", { "dependencies": { "@floating-ui/dom": "^1.8.0" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-JDjEFGCpImxDCA7JJKviA0M9+RtmJdj0m/NVU5IMgBK+AmZouAQQ7/+2GLH0GXXY0YMw9oXPB8hKdbPYg5QLYg=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
+
+    "@fullcalendar/core": ["@fullcalendar/core@6.1.21", "", { "dependencies": { "preact": "~10.12.1" } }, "sha512-t3u/+sqh3Iq7TWtUnVLcGDUE6OWZh0UD3c04bI/l7lSLAgAKr3kngBmhHiQD1QXpwC8ZN5iNqG7a7gOVixhSKQ=="],
+
+    "@fullcalendar/daygrid": ["@fullcalendar/daygrid@6.1.21", "", { "peerDependencies": { "@fullcalendar/core": "~6.1.21" } }, "sha512-QYb1y40RGYLlOxKpYWg8O+7njEnKnFG8Tt7qjnubJGR35s1phQg67E+81y2TyAbbm59p2JFOCXGDk9t6KDujIA=="],
+
+    "@fullcalendar/interaction": ["@fullcalendar/interaction@6.1.21", "", { "peerDependencies": { "@fullcalendar/core": "~6.1.21" } }, "sha512-WPYpqtljDWmU0Xm2cOtFrLlocgxv7cgkOppj34Q6OUUat8a6Cnd6kYo2JR+irP223PE5lBYHFNp1qh7SIpJc0w=="],
+
+    "@fullcalendar/list": ["@fullcalendar/list@6.1.21", "", { "peerDependencies": { "@fullcalendar/core": "~6.1.21" } }, "sha512-2rpIhs5pJmV7jyk4oX4bckNqurt6iHcsweE3FDYDdNpmRukPrARnyQYcaVFNVw2bnBFeR/jQW/St2MlauxF3GQ=="],
+
+    "@fullcalendar/react": ["@fullcalendar/react@6.1.21", "", { "peerDependencies": { "@fullcalendar/core": "~6.1.21", "react": "^16.7.0 || ^17 || ^18 || ^19", "react-dom": "^16.7.0 || ^17 || ^18 || ^19" } }, "sha512-TLpmGUd5k/PMdCh8XbeFC9PW9wuGvMms1oCxWgXyjK3EFPXAAd0PLfcvwKdyxoAS5eK1E4RJFkjMHvsYHpimcg=="],
+
+    "@fullcalendar/timegrid": ["@fullcalendar/timegrid@6.1.21", "", { "dependencies": { "@fullcalendar/daygrid": "~6.1.21" }, "peerDependencies": { "@fullcalendar/core": "~6.1.21" } }, "sha512-2DnShx/jallGmb8QCkr6pAOu/zuPhJrP7+uTrAtSnbqsX7GF3lTxqSeNGkTQwsgF5g/ia8udhQ+JNYaE+TN1cQ=="],
 
     "@hono/node-server": ["@hono/node-server@2.1.0", "", { "peerDependencies": { "hono": "^4" } }, "sha512-XovyyCCnBzW+zKu+z/zq8hwNs4KOR5rEMAOxo2f40Q5xoOI37IMm6MIg2COOUtUApo0i6850MTBKH2u4QLGIqg=="],
 
@@ -1358,6 +1376,8 @@
     "postcss-selector-parser": ["postcss-selector-parser@7.1.5", "", { "dependencies": { "cssesc": "^3.0.0", "util-deprecate": "^1.0.2" } }, "sha512-KvvtD7SrlBP7dlgkBghEE3r84CABm5SmV2aNcG4oCA+qDnJ/tvKonFVvwWAyyWUEwxuNawdfEAZKP9zM3oZ2Uw=="],
 
     "powershell-utils": ["powershell-utils@0.1.0", "", {}, "sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A=="],
+
+    "preact": ["preact@10.12.1", "", {}, "sha512-l8386ixSsBdbreOAkqtrwqHwdvR35ID8c3rKPa8lCWuO86dBi32QWHV4vfsZK1utLLFMvw+Z5Ad4XLkZzchscg=="],
 
     "prelude-ls": ["prelude-ls@1.2.1", "", {}, "sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g=="],
 
