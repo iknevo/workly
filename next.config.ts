@@ -1,7 +1,17 @@
-import type { NextConfig } from "next"
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["node-tectonic"],
-}
 
-export default nextConfig
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/dashboard",
+        permanent: false,
+      },
+    ];
+  },
+};
+
+export default nextConfig;
