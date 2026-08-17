@@ -14,11 +14,11 @@ import interactionPlugin, {
   type EventResizeDoneArg,
 } from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, addMinutes, endOfMonth, startOfMonth, subDays } from "date-fns";
 import { Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,11 @@ import type { events } from "@/db/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EVENT_TYPE_CONFIG } from "@/modules/applications/constants";
 import { useTRPC } from "@/trpc/client";
+
+const FullCalendar = dynamic(() => import("@fullcalendar/react"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[70vh] w-full rounded-lg" />,
+});
 
 type Event = typeof events.$inferSelect;
 

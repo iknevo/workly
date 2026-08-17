@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,46 @@ import { useTRPC } from "@/trpc/client";
 
 const FILTERS = ["all", "applied", "interviewing", "offer", "rejected", "draft"] as const;
 
+function ApplicationsListSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="mt-2 h-4 w-64" />
+        </div>
+        <Skeleton className="h-9 w-36" />
+      </div>
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-10 w-full" />
+        <div className="flex gap-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-24" />
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ApplicationsList() {
+  return (
+    <Suspense fallback={<ApplicationsListSkeleton />}>
+      <ErrorBoundary
+        fallback={<p className="text-sm text-muted-foreground">Failed to load applications.</p>}
+      >
+        <ApplicationsListSuspense />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function ApplicationsListSuspense() {
   const trpc = useTRPC();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [search, setSearch] = useState("");
@@ -76,13 +116,7 @@ export function ApplicationsList() {
         </Tabs>
       </div>
 
-      {applicationsQuery.isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <Card>
           <CardContent className="py-10">
             <Empty>
