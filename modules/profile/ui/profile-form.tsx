@@ -59,6 +59,7 @@ const toForm = (profile: UserProfile): ProfileFormInput => ({
     startYear: e.startYear ?? "",
     endYear: e.endYear ?? "",
     notes: e.notes ?? "",
+    projects: (e.projects ?? []).map(toProjectInput),
   })),
   projects: profile.projects.map(toProjectInput),
   links: profile.links.map((l) => ({ label: l.label, url: l.url })),

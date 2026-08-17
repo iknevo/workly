@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +12,39 @@ import { normalizeSkills } from "@/db/schema";
 import { ProfileForm } from "@/modules/profile/ui/profile-form";
 import { useTRPC } from "@/trpc/client";
 
+function ProfilePageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="mt-2 h-4 w-96" />
+      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-80" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-96 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ProfilePage() {
+  return (
+    <Suspense fallback={<ProfilePageSkeleton />}>
+      <ErrorBoundary
+        fallback={<p className="text-sm text-muted-foreground">Failed to load profile.</p>}
+      >
+        <ProfilePageSuspense />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function ProfilePageSuspense() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -62,7 +96,7 @@ export function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {meQuery.isLoading || !profile ? (
+          {!profile ? (
             <Skeleton className="h-96 w-full" />
           ) : (
             <ProfileForm

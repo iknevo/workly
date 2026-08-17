@@ -2,7 +2,8 @@
 
 import { BulletsEditor, Field, ProjectFields, SectionCard } from "../editors";
 import { ChevronDown, FolderGit2, Plus, Trash2 } from "lucide-react";
-import { Controller, useFieldArray } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { Controller, useFieldArray, useWatch } from "react-hook-form";
 import type { Control } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,16 @@ export function ExperienceTab({ control }: { control: Control<ProfileFormInput> 
     name: "experience",
   });
 
+  const [openFields, setOpenFields] = useState<Set<string>>(new Set());
+  const prevLength = useRef(fields.length);
+
+  useEffect(() => {
+    if (fields.length > prevLength.current && fields.length > 0) {
+      setOpenFields((prev) => new Set(prev).add(fields[fields.length - 1].id));
+    }
+    prevLength.current = fields.length;
+  }, [fields.length, fields]);
+
   return (
     <div className="flex flex-col gap-4">
       {fields.length === 0 ? (
@@ -50,6 +61,15 @@ export function ExperienceTab({ control }: { control: Control<ProfileFormInput> 
             index={index}
             control={control}
             onRemove={() => remove(index)}
+            open={openFields.has(field.id)}
+            onOpenChange={(isOpen) => {
+              setOpenFields((prev) => {
+                const next = new Set(prev);
+                if (isOpen) next.add(field.id);
+                else next.delete(field.id);
+                return next;
+              });
+            }}
           />
         ))
       )}
@@ -67,18 +87,47 @@ function ExperienceEntry({
   index,
   control,
   onRemove,
+  open,
+  onOpenChange,
 }: {
   index: number;
   control: Control<ProfileFormInput>;
   onRemove: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
+  const role = useWatch({ control, name: `experience.${index}.role` });
+  const company = useWatch({ control, name: `experience.${index}.company` });
+  const summary = [role, company].filter(Boolean).join(" at ") || undefined;
+
   const projectsFieldArray = useFieldArray({
     control,
     name: `experience.${index}.projects`,
   });
 
+  const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
+  const prevProjectLength = useRef(projectsFieldArray.fields.length);
+
+  useEffect(() => {
+    if (
+      projectsFieldArray.fields.length > prevProjectLength.current &&
+      projectsFieldArray.fields.length > 0
+    ) {
+      setOpenProjects((prev) =>
+        new Set(prev).add(projectsFieldArray.fields[projectsFieldArray.fields.length - 1].id)
+      );
+    }
+    prevProjectLength.current = projectsFieldArray.fields.length;
+  }, [projectsFieldArray.fields.length, projectsFieldArray]);
+
   return (
-    <SectionCard index={index} onRemove={onRemove}>
+    <SectionCard
+      index={index}
+      onRemove={onRemove}
+      summary={summary}
+      open={open}
+      onOpenChange={onOpenChange}
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <Controller
           name={`experience.${index}.role` as const}
@@ -169,25 +218,22 @@ function ExperienceEntry({
             </p>
           )}
           {projectsFieldArray.fields.map((project, projectIndex) => (
-            <div key={project.id} className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-muted-foreground">
-                  Project #{projectIndex + 1}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => projectsFieldArray.remove(projectIndex)}
-                  aria-label="Remove project"
-                >
-                  <Trash2 />
-                </Button>
-              </div>
-              <ProjectFields
-                prefix={`experience.${index}.projects.${projectIndex}`}
-                control={control}
-              />
-            </div>
+            <ExperienceProjectEntry
+              key={project.id}
+              projectIndex={projectIndex}
+              experienceIndex={index}
+              control={control}
+              onRemove={() => projectsFieldArray.remove(projectIndex)}
+              open={openProjects.has(project.id)}
+              onOpenChange={(isOpen) => {
+                setOpenProjects((prev) => {
+                  const next = new Set(prev);
+                  if (isOpen) next.add(project.id);
+                  else next.delete(project.id);
+                  return next;
+                });
+              }}
+            />
           ))}
           <div>
             <Button
@@ -202,5 +248,60 @@ function ExperienceEntry({
         </CollapsibleContent>
       </Collapsible>
     </SectionCard>
+  );
+}
+
+function ExperienceProjectEntry({
+  projectIndex,
+  experienceIndex,
+  control,
+  onRemove,
+  open,
+  onOpenChange,
+}: {
+  projectIndex: number;
+  experienceIndex: number;
+  control: Control<ProfileFormInput>;
+  onRemove: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const name = useWatch({
+    control,
+    name: `experience.${experienceIndex}.projects.${projectIndex}.name`,
+  });
+  const summary = name || undefined;
+  const prefix = `experience.${experienceIndex}.projects.${projectIndex}` as const;
+
+  return (
+    <div className="rounded-lg border bg-muted/30">
+      <div className="flex items-center gap-2 p-3 pb-0">
+        <button
+          type="button"
+          onClick={() => onOpenChange(!open)}
+          className="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+        >
+          <ChevronDown
+            className={"size-4 transition-transform duration-200" + (open ? " rotate-180" : "")}
+          />
+        </button>
+        <span className="text-xs font-semibold text-muted-foreground">
+          Project #{projectIndex + 1}
+        </span>
+        {!open && summary && (
+          <span className="truncate text-sm text-muted-foreground">— {summary}</span>
+        )}
+        <div className="ml-auto">
+          <Button variant="ghost" size="icon-sm" onClick={onRemove} aria-label="Remove project">
+            <Trash2 />
+          </Button>
+        </div>
+      </div>
+      {open && (
+        <div className="flex flex-col gap-4 p-3 pt-2">
+          <ProjectFields prefix={prefix} control={control} />
+        </div>
+      )}
+    </div>
   );
 }
