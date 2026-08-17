@@ -1,7 +1,22 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 
 import { EditApplication } from "@/modules/applications/ui/edit-application";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, caller, prefetch, trpc } from "@/trpc/server";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ applicationId: string }>;
+}): Promise<Metadata> {
+  const { applicationId } = await params;
+  try {
+    const app = await caller.applications.getOne({ id: applicationId });
+    return { title: `Edit ${app.position}` };
+  } catch {
+    return { title: "Edit Application" };
+  }
+}
 
 export default async function EditApplicationPage({
   params,

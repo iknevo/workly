@@ -1,7 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 
 import { CalendarPage } from "@/modules/events/ui/calendar-page";
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+
+export const metadata: Metadata = { title: "Calendar" };
 
 export default async function CalendarRoute() {
   await auth.protect();

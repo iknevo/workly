@@ -1,7 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 
 import { NewResumePage } from "@/modules/resumes/ui/new-resume-page";
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+
+export const metadata: Metadata = { title: "New Resume" };
 
 export default async function NewResumeRoute() {
   await auth.protect();

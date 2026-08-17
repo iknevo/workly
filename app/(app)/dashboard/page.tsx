@@ -1,7 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 
 import { Dashboard } from "@/modules/dashboard/ui/dashboard";
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   await auth.protect();
