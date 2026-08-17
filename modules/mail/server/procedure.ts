@@ -111,8 +111,6 @@ async function performSync(userId: string, applicationId: string) {
       let totalListed = 0;
 
       for (const query of queries) {
-        let fetchedThisQuery = 0;
-
         const uids = await session.search(query as SearchObject);
         totalListed += uids.length;
         if (totalListed > TOTAL_LIST_CAP)
@@ -133,87 +131,142 @@ async function performSync(userId: string, applicationId: string) {
             : [];
         const byUid = new Map(existingRows.map((r) => [r.messageUid, r]));
 
+        const unfetchedUids: number[] = [];
         for (const uid of uids) {
           if (processed.has(uid)) continue;
           processed.add(uid);
+          if (byUid.has(uid)) continue;
+          if (unfetchedUids.length >= PER_QUERY_EVAL_BUDGET) break;
+          unfetchedUids.push(uid);
+        }
 
-          let existing = byUid.get(uid);
-          let from = existing?.fromEmail ?? "";
-          let subject = existing?.subject ?? "";
-          let snippet = existing?.snippet ?? "";
+        if (unfetchedUids.length > 0) {
+          const fetchedMessages: {
+            uid: number;
+            envelope: NonNullable<Awaited<ReturnType<typeof session.fetch>>>["envelope"];
+            labels: NonNullable<Awaited<ReturnType<typeof session.fetch>>>["labels"];
+            source: Buffer;
+            internalDate: Date | null;
+            flags: Set<string>;
+            to: string;
+          }[] = [];
 
-          if (!existing) {
-            if (fetchedThisQuery >= PER_QUERY_EVAL_BUDGET) break;
-            fetchedThisQuery += 1;
-
+          for (const uid of unfetchedUids) {
             const fetched = await session.fetch(uid);
             if (!fetched) continue;
             if (isJunkLabels(fetched.labels)) continue;
-
-            from = formatEnvelopeAddress(fetched.envelope.from);
-            subject = fetched.envelope.subject ?? "";
-            snippet = await makeSnippet(fetched.source);
-            const bodyText = await parseBodyText(fetched.source);
-
-            const [email] = await db
-              .insert(emails)
-              .values({
-                userId,
-                mailAccountId: account.id,
-                messageUid: uid,
-                threadId: null,
-                subject: subject || null,
-                fromEmail: from || null,
-                toEmail: formatEnvelopeAddress(fetched.envelope.to) || null,
-                senderEmail: parseEmailAddress(from) || null,
-                snippet: snippet || null,
-                bodyText: bodyText || null,
-                internalDate: fetched.internalDate ?? fetched.envelope.date ?? null,
-                isRead: fetched.flags.has("\\Seen"),
-              })
-              .onConflictDoNothing()
-              .returning({ id: emails.id });
-
-            if (email) {
-              existing = { id: email.id, messageUid: uid, fromEmail: from, subject, snippet };
-            } else {
-              const [row] = await db
-                .select({
-                  id: emails.id,
-                  messageUid: emails.messageUid,
-                  fromEmail: emails.fromEmail,
-                  subject: emails.subject,
-                  snippet: emails.snippet,
-                })
-                .from(emails)
-                .where(and(eq(emails.mailAccountId, account.id), eq(emails.messageUid, uid)))
-                .limit(1);
-              existing = row ?? undefined;
-            }
+            fetchedMessages.push({
+              uid,
+              envelope: fetched.envelope,
+              labels: fetched.labels,
+              source: fetched.source,
+              internalDate: fetched.internalDate,
+              flags: fetched.flags,
+              to: formatEnvelopeAddress(fetched.envelope.to),
+            });
           }
 
-          if (!existing) continue;
+          if (fetchedMessages.length > 0) {
+            const insertValues = fetchedMessages.map((msg) => {
+              const from = formatEnvelopeAddress(msg.envelope.from);
+              return {
+                userId,
+                mailAccountId: account.id,
+                messageUid: msg.uid,
+                threadId: null,
+                subject: (msg.envelope.subject ?? "") || null,
+                fromEmail: from || null,
+                toEmail: msg.to || null,
+                senderEmail: parseEmailAddress(from) || null,
+                snippet: "",
+                bodyText: "",
+                internalDate: msg.internalDate ?? msg.envelope.date ?? null,
+                isRead: msg.flags.has("\\Seen"),
+              };
+            });
 
-          const { include, score, reasons } = evaluateEmail({
-            from,
-            subject,
-            snippet,
-            context,
-          });
-          if (!include) continue;
+            const inserted = await db
+              .insert(emails)
+              .values(insertValues)
+              .onConflictDoNothing()
+              .returning({ id: emails.id, messageUid: emails.messageUid });
 
-          const [link] = await db
-            .insert(emailApplications)
-            .values({
-              emailId: existing.id,
-              applicationId: application.id,
-              relevanceScore: score,
-              matchReasons: reasons,
-            })
-            .onConflictDoNothing()
-            .returning({ id: emailApplications.id });
+            const insertedByUid = new Map(inserted.map((r) => [r.messageUid, r]));
 
-          if (link) insertedCount += 1;
+            for (const msg of fetchedMessages) {
+              const snippet = await makeSnippet(msg.source);
+              const bodyText = await parseBodyText(msg.source);
+
+              const insertedRow = insertedByUid.get(msg.uid);
+              if (insertedRow) {
+                await db
+                  .update(emails)
+                  .set({ snippet, bodyText })
+                  .where(eq(emails.id, insertedRow.id));
+              }
+
+              let existing:
+                | {
+                    id: string;
+                    messageUid: number;
+                    fromEmail: string | null;
+                    subject: string | null;
+                    snippet: string | null;
+                  }
+                | undefined;
+              if (insertedRow) {
+                const from = formatEnvelopeAddress(msg.envelope.from);
+                existing = {
+                  id: insertedRow.id,
+                  messageUid: msg.uid,
+                  fromEmail: from,
+                  subject: msg.envelope.subject ?? null,
+                  snippet,
+                };
+              } else {
+                const [row] = await db
+                  .select({
+                    id: emails.id,
+                    messageUid: emails.messageUid,
+                    fromEmail: emails.fromEmail,
+                    subject: emails.subject,
+                    snippet: emails.snippet,
+                  })
+                  .from(emails)
+                  .where(and(eq(emails.mailAccountId, account.id), eq(emails.messageUid, msg.uid)))
+                  .limit(1);
+                existing = row ?? undefined;
+              }
+
+              if (!existing) continue;
+
+              const from = existing.fromEmail ?? "";
+              const subject = existing.subject ?? "";
+              const snip = existing.snippet ?? "";
+
+              const { include, score, reasons } = evaluateEmail({
+                from,
+                subject,
+                snippet: snip,
+                bodyText,
+                context,
+              });
+              if (!include) continue;
+
+              const [link] = await db
+                .insert(emailApplications)
+                .values({
+                  emailId: existing.id,
+                  applicationId: application.id,
+                  relevanceScore: score,
+                  matchReasons: reasons,
+                })
+                .onConflictDoNothing()
+                .returning({ id: emailApplications.id });
+
+              if (link) insertedCount += 1;
+            }
+          }
         }
       }
     } catch (err) {
@@ -241,6 +294,7 @@ async function performSync(userId: string, applicationId: string) {
       from: link.fromEmail ?? "",
       subject: link.subject ?? "",
       snippet: link.snippet ?? "",
+      bodyText: null,
       context,
     });
     if (!include) stale.push(link.id);
@@ -270,6 +324,7 @@ async function reevaluateStoredEmails(
       fromEmail: emails.fromEmail,
       subject: emails.subject,
       snippet: emails.snippet,
+      bodyText: emails.bodyText,
     })
     .from(emails)
     .where(eq(emails.userId, userId));
@@ -294,6 +349,7 @@ async function reevaluateStoredEmails(
       from: row.fromEmail ?? "",
       subject: row.subject ?? "",
       snippet: row.snippet ?? "",
+      bodyText: row.bodyText,
       context,
     });
     if (!include) continue;

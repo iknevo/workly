@@ -30,7 +30,7 @@ function linkify(text: string, keyPrefix: string): ReactNode {
           href={url}
           title={url}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="wrap-break-word text-primary underline underline-offset-2 hover:text-primary/80"
         >
           {displayUrl(url)}

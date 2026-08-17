@@ -142,16 +142,19 @@ export function evaluateEmail({
   from,
   subject,
   snippet,
+  bodyText,
   context,
 }: {
   from: string;
   subject: string;
   snippet: string;
+  bodyText?: string | null;
   context: ScoreContext;
 }): EmailEvaluation {
   const fromLower = from.toLowerCase();
   const subj = subject.toLowerCase();
   const snip = snippet.toLowerCase();
+  const body = (bodyText ?? "").toLowerCase();
   const senderDomain = extractDomain(parseEmailAddress(from));
 
   const terms = [
@@ -181,11 +184,12 @@ export function evaluateEmail({
     const inSubject = subj.includes(term);
     const inFrom = fromLower.includes(term);
     const inSnippet = snip.includes(term);
-    if (inSubject || inFrom || inSnippet) {
+    const inBody = body.includes(term);
+    if (inSubject || inFrom || inSnippet || inBody) {
       include = true;
-      score += inSubject ? 35 : inFrom ? 30 : 15;
+      score += inSubject ? 35 : inFrom ? 30 : inBody ? 20 : 15;
       reasons.push(
-        `Matches "${term}"${inSubject ? " (subject)" : inFrom ? " (sender)" : " (snippet)"}`
+        `Matches "${term}"${inSubject ? " (subject)" : inFrom ? " (sender)" : inBody ? " (body)" : " (snippet)"}`
       );
     }
   }
