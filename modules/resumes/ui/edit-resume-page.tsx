@@ -1,18 +1,16 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-
 import { ResumeEditor } from "./resume-editor";
-
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
 
 export function EditResumePage({ resumeId }: { resumeId: string }) {
   const router = useRouter();
@@ -24,7 +22,10 @@ export function EditResumePage({ resumeId }: { resumeId: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <Link href={`/resumes/${resumeId}`} className={buttonVariants({ variant: "ghost", size: "icon-sm" })}>
+        <Link
+          href={`/resumes/${resumeId}`}
+          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+        >
           <ArrowLeft />
         </Link>
         <div>

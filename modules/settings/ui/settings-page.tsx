@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Info, KeyRound, Mail, Trash2, UserRound } from "lucide-react";
-import Link from "next/link";
 import { useTheme } from "next-themes";
+import Link from "next/link";
 import { SubmitEventHandler, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -163,7 +163,8 @@ export function SettingsPage() {
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium">Email</span>
               <span className="text-xs text-muted-foreground">
-                Connect one or more email accounts so recruiter emails auto-sync to each application.
+                Connect one or more email accounts so recruiter emails auto-sync to each
+                application.
               </span>
             </div>
             {accountsQuery.isLoading ? (

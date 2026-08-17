@@ -1,11 +1,10 @@
 "use client";
 
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-
-import { Copy, Check } from "lucide-react";
 
 export function ResumeCodeViewer({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);

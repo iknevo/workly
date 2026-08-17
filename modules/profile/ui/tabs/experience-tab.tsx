@@ -1,8 +1,9 @@
 "use client";
 
-import { useFieldArray, Controller } from "react-hook-form";
-import type { Control } from "react-hook-form";
+import { BulletsEditor, Field, ProjectFields, SectionCard } from "../editors";
 import { ChevronDown, FolderGit2, Plus, Trash2 } from "lucide-react";
+import { Controller, useFieldArray } from "react-hook-form";
+import type { Control } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -10,8 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { ProfileExperienceInput, ProfileFormInput } from "@/db/schema";
-
-import { BulletsEditor, Field, ProjectFields, SectionCard } from "../editors";
 
 const emptyExperience = (): ProfileExperienceInput => ({
   role: "",
@@ -104,7 +103,11 @@ function ExperienceEntry({
           control={control}
           render={({ field }) => (
             <Field label="Location">
-              <Input {...field} value={field.value ?? ""} placeholder="Remote / San Francisco, CA" />
+              <Input
+                {...field}
+                value={field.value ?? ""}
+                placeholder="Remote / San Francisco, CA"
+              />
             </Field>
           )}
         />
@@ -134,7 +137,12 @@ function ExperienceEntry({
         control={control}
         render={({ field }) => (
           <Field label="Summary">
-            <Textarea {...field} value={field.value ?? ""} placeholder="One or two lines about the role." rows={2} />
+            <Textarea
+              {...field}
+              value={field.value ?? ""}
+              placeholder="One or two lines about the role."
+              rows={2}
+            />
           </Field>
         )}
       />
@@ -145,9 +153,7 @@ function ExperienceEntry({
       />
       <Collapsible className="flex flex-col gap-3">
         <CollapsibleTrigger
-          render={
-            <Button variant="outline" size="sm" className="w-full text-muted-foreground" />
-          }
+          render={<Button variant="outline" size="sm" className="w-full text-muted-foreground" />}
         >
           <FolderGit2 className="size-4" />
           Related projects
@@ -163,10 +169,7 @@ function ExperienceEntry({
             </p>
           )}
           {projectsFieldArray.fields.map((project, projectIndex) => (
-            <div
-              key={project.id}
-              className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-3"
-            >
+            <div key={project.id} className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-muted-foreground">
                   Project #{projectIndex + 1}

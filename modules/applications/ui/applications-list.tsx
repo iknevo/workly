@@ -1,7 +1,11 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+
+import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -11,14 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { cn } from "@/lib/utils";
-
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-
 import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
-
-import { Plus, Search } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
 
 const FILTERS = ["all", "applied", "interviewing", "offer", "rejected", "draft"] as const;
 
@@ -28,8 +26,7 @@ export function ApplicationsList() {
   const [search, setSearch] = useState("");
 
   const applicationsQuery = useQuery(trpc.applications.getMany.queryOptions());
-
-  const applications = applicationsQuery.data ?? [];
+  const applications = useMemo(() => applicationsQuery.data ?? [], [applicationsQuery.data]);
 
   const filtered = useMemo(() => {
     return applications.filter((app) => {

@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
-
 import { ApplicationDetail } from "@/modules/applications/ui/application-detail";
+import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 
 export default async function ApplicationPage({
   params,

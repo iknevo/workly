@@ -1,7 +1,11 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+
+import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -9,18 +13,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { cn } from "@/lib/utils";
-
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-
 import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
+import { EmailsTab } from "@/modules/applications/ui/tabs/emails-tab";
 import { OverviewTab } from "@/modules/applications/ui/tabs/overview-tab";
 import { ResumeTab } from "@/modules/applications/ui/tabs/resume-tab";
 import { TimelineTab } from "@/modules/applications/ui/tabs/timeline-tab";
-import { EmailsTab } from "@/modules/applications/ui/tabs/emails-tab";
-
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
 
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
@@ -32,7 +30,10 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <Link href="/applications" className={buttonVariants({ variant: "ghost", size: "icon-sm" })}>
+        <Link
+          href="/applications"
+          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+        >
           <ArrowLeft />
         </Link>
         {applicationQuery.isLoading ? (
@@ -40,12 +41,14 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         ) : application ? (
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">{application.position}</h1>
+              <h1 className="min-w-0 text-2xl font-semibold tracking-tight wrap-break-word">
+                {application.position}
+              </h1>
               <Badge className={cn(APPLICATION_STATUS_CONFIG[application.status].className)}>
                 {APPLICATION_STATUS_CONFIG[application.status].label}
               </Badge>
             </div>
-            <p className="min-w-0 break-words text-sm text-muted-foreground">
+            <p className="min-w-0 text-sm wrap-break-word text-muted-foreground">
               {application.company}
               {application.location ? ` · ${application.location}` : ""}
               {application.url ? (
@@ -74,7 +77,15 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           <TabsTrigger value="emails">Emails</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="pt-4">
-          {application ? <OverviewTab application={application} /> : <Card><CardContent className="py-10"><Skeleton className="h-40 w-full" /></CardContent></Card>}
+          {application ? (
+            <OverviewTab application={application} />
+          ) : (
+            <Card>
+              <CardContent className="py-10">
+                <Skeleton className="h-40 w-full" />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
         <TabsContent value="resume" className="pt-4">
           <ResumeTab applicationId={applicationId} />

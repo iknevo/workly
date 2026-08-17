@@ -70,15 +70,12 @@ export type VerifiedConnection = {
   allMailPath: string | null;
 };
 
-export async function verifyConnection(
-  config: ImapAccountConfig
-): Promise<VerifiedConnection> {
+export async function verifyConnection(config: ImapAccountConfig): Promise<VerifiedConnection> {
   const client = createClient(config);
   try {
     await client.connect();
     const folders = await client.list();
-    const allMailPath =
-      folders.find((m) => m.specialUse === "\\All")?.path ?? null;
+    const allMailPath = folders.find((m) => m.specialUse === "\\All")?.path ?? null;
     return {
       email: config.email,
       folders: folders.map((m) => m.path),
@@ -112,7 +109,7 @@ export class ImapSession {
 
   async close(): Promise<void> {
     try {
-      await this.client.close();
+      this.client.close();
     } catch {
       // best-effort teardown
     }
@@ -175,9 +172,7 @@ export class ImapSession {
   }
 }
 
-export function formatEnvelopeAddress(
-  addresses: MessageAddressObject[] | undefined
-): string {
+export function formatEnvelopeAddress(addresses: MessageAddressObject[] | undefined): string {
   if (!addresses || addresses.length === 0) return "";
   return addresses
     .map((a) => {
@@ -194,9 +189,7 @@ export async function parseBodyText(source: Buffer): Promise<string> {
   if (source.length === 0) return "";
   try {
     const parsed = await simpleParser(source);
-    return (
-      parsed.text || (parsed.textAsHtml ? stripHtml(parsed.textAsHtml) : "") || ""
-    ).trim();
+    return (parsed.text || (parsed.textAsHtml ? stripHtml(parsed.textAsHtml) : "") || "").trim();
   } catch {
     return "";
   }

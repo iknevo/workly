@@ -22,8 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/toast";
 import { TimePicker } from "@/components/ui/time-picker";
+import { toast } from "@/components/ui/toast";
 
 import type { events } from "@/db/schema";
 import { insertEventSchema } from "@/db/schema";
@@ -276,7 +276,7 @@ export function EventFormDialog({
                 <TimePicker
                   value={field.value ? toTimeString(field.value) : ""}
                   onChange={(time) => field.onChange(mergeTime(field.value ?? new Date(), time))}
-                  className="w-[7.5rem]"
+                  className="w-30"
                 />
               </div>
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -334,7 +334,7 @@ export function EventFormDialog({
                     <TimePicker
                       value={toTimeString(value)}
                       onChange={(time) => field.onChange(mergeTime(value, time))}
-                      className="w-[7.5rem]"
+                      className="w-30"
                     />
                   </div>
                 )}

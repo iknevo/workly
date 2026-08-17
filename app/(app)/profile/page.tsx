@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
-
 import { ProfilePage } from "@/modules/profile/ui/profile-page";
+import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 
 export default async function ProfileRoute() {
   await auth.protect();

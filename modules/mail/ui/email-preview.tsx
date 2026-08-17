@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, Copy, EyeOff, Reply, Undo2, X } from "lucide-react";
+import { useEffect } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EmailBody } from "@/modules/mail/ui/email-body";
 import { useTRPC } from "@/trpc/client";
@@ -108,7 +109,9 @@ export function EmailPreviewDrawer({
     : null;
 
   const body = email
-    ? email.bodyText ?? bodyQuery.data?.bodyText ?? (bodyQuery.isFetching ? "" : (email.snippet ?? ""))
+    ? (email.bodyText ??
+      bodyQuery.data?.bodyText ??
+      (bodyQuery.isFetching ? "" : (email.snippet ?? "")))
     : "";
 
   return (
@@ -144,7 +147,12 @@ export function EmailPreviewDrawer({
                   <ChevronRight />
                 </Button>
               </div>
-              <Button variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)} title="Close">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onOpenChange(false)}
+                title="Close"
+              >
                 <X />
               </Button>
             </div>
@@ -161,10 +169,15 @@ export function EmailPreviewDrawer({
                         {email.fromEmail ?? "(unknown sender)"}
                       </span>
                       {!email.isRead && (
-                        <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+                        <span
+                          className="size-2 shrink-0 rounded-full bg-primary"
+                          aria-label="Unread"
+                        />
                       )}
                     </span>
-                    <span className="truncate text-xs text-muted-foreground">{email.fromEmail}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {email.fromEmail}
+                    </span>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -179,16 +192,16 @@ export function EmailPreviewDrawer({
                 </div>
               </div>
 
-              <h2 className="break-words text-base font-semibold leading-snug">
+              <h2 className="text-base leading-snug font-semibold wrap-break-word">
                 {email.subject || "(no subject)"}
               </h2>
 
               {email.toEmail ? (
-                <p className="break-words text-xs text-muted-foreground">To: {email.toEmail}</p>
+                <p className="text-xs wrap-break-word text-muted-foreground">To: {email.toEmail}</p>
               ) : null}
 
               {accountEmail ? (
-                <p className="break-words text-xs text-muted-foreground">Via: {accountEmail}</p>
+                <p className="text-xs wrap-break-word text-muted-foreground">Via: {accountEmail}</p>
               ) : null}
 
               {(email.matchReasons?.length ?? 0) > 0 ? (

@@ -1,16 +1,15 @@
 "use client";
 
-import { useFieldArray, Controller } from "react-hook-form";
-import type { Control } from "react-hook-form";
+import { Field, SectionCard } from "../editors";
 import { Plus } from "lucide-react";
+import { Controller, useFieldArray } from "react-hook-form";
+import type { Control } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 import type { ProfileFormInput, ProfileLinkInput } from "@/db/schema";
-
-import { Field, SectionCard } from "../editors";
 
 const emptyLink = (): ProfileLinkInput => ({ label: "", url: "" });
 

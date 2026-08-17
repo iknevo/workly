@@ -1,19 +1,17 @@
 "use client";
 
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery } from "@tanstack/react-query";
-
 import { ApplicationForm } from "./application-form";
-
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
 
 export function EditApplication({ applicationId }: { applicationId: string }) {
   const router = useRouter();

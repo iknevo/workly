@@ -73,7 +73,11 @@ export function ProjectFields({
         control={control}
         render={({ field }) => (
           <Field label="Description">
-            <Textarea {...field} placeholder="What did you build and why does it matter?" rows={3} />
+            <Textarea
+              {...field}
+              placeholder="What did you build and why does it matter?"
+              rows={3}
+            />
           </Field>
         )}
       />

@@ -20,12 +20,18 @@ export const eventsRouter = createTRPCRouter({
       return db
         .select()
         .from(events)
-        .where(and(eq(events.userId, user.id), gte(events.startTime, input.start), lte(events.startTime, input.end)))
+        .where(
+          and(
+            eq(events.userId, user.id),
+            gte(events.startTime, input.start),
+            lte(events.startTime, input.end)
+          )
+        )
         .orderBy(asc(events.startTime));
     }),
 
   getManyForApplication: protectedProcedure
-    .input(z.object({ applicationId: z.string().uuid() }))
+    .input(z.object({ applicationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const { user } = ctx;
 
@@ -44,37 +50,39 @@ export const eventsRouter = createTRPCRouter({
         .orderBy(asc(events.startTime));
     }),
 
-  create: protectedProcedure.input(insertEventSchema.omit({ userId: true })).mutation(async ({ ctx, input }) => {
-    const { user } = ctx;
+  create: protectedProcedure
+    .input(insertEventSchema.omit({ userId: true }))
+    .mutation(async ({ ctx, input }) => {
+      const { user } = ctx;
 
-    if (input.applicationId) {
-      const [application] = await db
-        .select({ id: applications.id })
-        .from(applications)
-        .where(and(eq(applications.id, input.applicationId), eq(applications.userId, user.id)))
-        .limit(1);
+      if (input.applicationId) {
+        const [application] = await db
+          .select({ id: applications.id })
+          .from(applications)
+          .where(and(eq(applications.id, input.applicationId), eq(applications.userId, user.id)))
+          .limit(1);
 
-      if (!application) throw new TRPCError({ code: "NOT_FOUND" });
-    }
+        if (!application) throw new TRPCError({ code: "NOT_FOUND" });
+      }
 
-    const [event] = await db
-      .insert(events)
-      .values({
-        userId: user.id,
-        applicationId: input.applicationId ?? null,
-        title: input.title,
-        description: input.description ?? null,
-        startTime: input.startTime,
-        endTime: input.endTime ?? null,
-        type: input.type ?? "other",
-      })
-      .returning();
+      const [event] = await db
+        .insert(events)
+        .values({
+          userId: user.id,
+          applicationId: input.applicationId ?? null,
+          title: input.title,
+          description: input.description ?? null,
+          startTime: input.startTime,
+          endTime: input.endTime ?? null,
+          type: input.type ?? "other",
+        })
+        .returning();
 
-    return event;
-  }),
+      return event;
+    }),
 
   update: protectedProcedure
-    .input(updateEventSchema.omit({ userId: true }).extend({ id: z.string().uuid() }))
+    .input(updateEventSchema.omit({ userId: true }).extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { user } = ctx;
 
@@ -106,17 +114,15 @@ export const eventsRouter = createTRPCRouter({
       return updated;
     }),
 
-  remove: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      const { user } = ctx;
+  remove: protectedProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
+    const { user } = ctx;
 
-      const [deleted] = await db
-        .delete(events)
-        .where(and(eq(events.id, input.id), eq(events.userId, user.id)))
-        .returning();
+    const [deleted] = await db
+      .delete(events)
+      .where(and(eq(events.id, input.id), eq(events.userId, user.id)))
+      .returning();
 
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
-      return deleted;
-    }),
+    if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
+    return deleted;
+  }),
 });

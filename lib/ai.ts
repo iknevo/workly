@@ -40,9 +40,7 @@ Rules:
 - The resume should fit on one to two pages.
 - Output ONLY the raw LaTeX source. No markdown fences, no commentary, no explanation. Start with \\documentclass and end with \\end{document}.`;
 
-export async function generateTailoredResume(
-  input: GenerateResumeInput
-): Promise<string> {
+export async function generateTailoredResume(input: GenerateResumeInput): Promise<string> {
   if (!groq) {
     throw new Error("GROQ_API_KEY is not configured");
   }

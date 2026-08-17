@@ -1,15 +1,18 @@
 "use client";
 
-import dayGridPlugin from "@fullcalendar/daygrid";
 import type {
   CalendarOptions,
-  DatesSetArg,
   DateSelectArg,
+  DatesSetArg,
   EventClickArg,
   EventDropArg,
   EventInput,
 } from "@fullcalendar/core";
-import interactionPlugin, { type DateClickArg, type EventResizeDoneArg } from "@fullcalendar/interaction";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin, {
+  type DateClickArg,
+  type EventResizeDoneArg,
+} from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -19,15 +22,20 @@ import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { EventFormDialog } from "./event-form-dialog";
 import type { events } from "@/db/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EVENT_TYPE_CONFIG } from "@/modules/applications/constants";
 import { useTRPC } from "@/trpc/client";
-
-import { EventFormDialog } from "./event-form-dialog";
 
 type Event = typeof events.$inferSelect;
 
@@ -164,7 +172,8 @@ export function CalendarPage() {
       {
         id: existing.id,
         startTime: arg.event.start,
-        endTime: arg.event.end ?? addMinutes(arg.event.start, Math.max(durationMs, MIN_EVENT_DURATION_MS)),
+        endTime:
+          arg.event.end ?? addMinutes(arg.event.start, Math.max(durationMs, MIN_EVENT_DURATION_MS)),
       },
       { onError: () => arg.revert() }
     );

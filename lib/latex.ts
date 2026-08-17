@@ -1,8 +1,7 @@
 import { compile } from "node-tectonic";
 
 export type CompileResult =
-  | { ok: true; pdfBase64: string; log: string }
-  | { ok: false; error: string };
+  { ok: true; pdfBase64: string; log: string } | { ok: false; error: string };
 
 const MATH_ERROR_HINT = `This error is usually caused by an unclosed math delimiter.
 Check for a lone "$" or a single "\\[" in the source. To add vertical spacing

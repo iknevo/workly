@@ -1,3 +1,4 @@
+import { defineRelations } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -10,33 +11,40 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-
-import { defineRelations } from "drizzle-orm";
-
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
-
 import { z } from "zod";
 
-const isUrl = (v: string) => z.string().url().safeParse(v).success;
-const isEmail = (v: string) => z.string().email().safeParse(v).success;
+const isUrl = (v: string) => z.url().safeParse(v).success;
+const isEmail = (v: string) => z.email().safeParse(v).success;
 
 export const profileLinkSchema = z.object({
   label: z.string().trim().max(100, "Label is too long"),
-  url: z.string().trim().refine((v) => v === "" || isUrl(v), {
-    message: "Link must be a valid URL",
-  }),
+  url: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || isUrl(v), {
+      message: "Link must be a valid URL",
+    }),
 });
 
 export const profileProjectSchema = z
   .object({
     name: z.string().trim().max(200, "Name is too long"),
     description: z.string().trim().max(3000, "Description is too long"),
-    previewUrl: z.string().trim().refine((v) => v === "" || isUrl(v), {
-      message: "Preview URL must be a valid URL",
-    }).nullable(),
-    sourceCodeUrl: z.string().trim().refine((v) => v === "" || isUrl(v), {
-      message: "Source code URL must be a valid URL",
-    }).nullable(),
+    previewUrl: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || isUrl(v), {
+        message: "Preview URL must be a valid URL",
+      })
+      .nullable(),
+    sourceCodeUrl: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || isUrl(v), {
+        message: "Source code URL must be a valid URL",
+      })
+      .nullable(),
     tech: z.array(z.string().trim().max(100)),
   })
   .transform((p) => ({
@@ -120,9 +128,13 @@ export function normalizeSkills(
 export const profileUpdateSchema = z
   .object({
     name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
-    email: z.string().trim().refine((v) => v === "" || isEmail(v), {
-      message: "Email must be valid",
-    }).nullable(),
+    email: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || isEmail(v), {
+        message: "Email must be valid",
+      })
+      .nullable(),
     headline: z.string().trim().max(300).nullable(),
     phone: z.string().trim().max(100).nullable(),
     location: z.string().trim().max(200).nullable(),
@@ -501,13 +513,11 @@ export const selectResumeSchema = createSelectSchema(resumes);
 
 export const insertApplicationSchema = createInsertSchema(applications, {
   company: (s) => s.trim().min(1, "Company is required").max(200, "Company is too long"),
-  position: (s) =>
-    s.trim().min(1, "Position is required").max(200, "Position is too long"),
+  position: (s) => s.trim().min(1, "Position is required").max(200, "Position is too long"),
 });
 export const updateApplicationSchema = createUpdateSchema(applications, {
   company: (s) => s.trim().min(1, "Company is required").max(200, "Company is too long"),
-  position: (s) =>
-    s.trim().min(1, "Position is required").max(200, "Position is too long"),
+  position: (s) => s.trim().min(1, "Position is required").max(200, "Position is too long"),
 });
 export const selectApplicationSchema = createSelectSchema(applications);
 

@@ -121,11 +121,7 @@ function ResumeCard({
             >
               <Pencil />
             </Link>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => remove.mutate({ id: resume.id })}
-            >
+            <Button variant="ghost" size="icon-sm" onClick={() => remove.mutate({ id: resume.id })}>
               <Trash2 />
             </Button>
           </div>

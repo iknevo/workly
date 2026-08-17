@@ -6,11 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
-import { useTRPC } from "@/trpc/client";
-
 import { normalizeSkills } from "@/db/schema";
-
 import { ProfileForm } from "@/modules/profile/ui/profile-form";
+import { useTRPC } from "@/trpc/client";
 
 export function ProfilePage() {
   const trpc = useTRPC();

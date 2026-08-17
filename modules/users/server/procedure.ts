@@ -34,31 +34,29 @@ export const usersRouter = createTRPCRouter({
       return updated;
     }),
 
-  updateProfile: protectedProcedure
-    .input(profileUpdateSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { user } = ctx;
+  updateProfile: protectedProcedure.input(profileUpdateSchema).mutation(async ({ ctx, input }) => {
+    const { user } = ctx;
 
-      const [updated] = await db
-        .update(users)
-        .set({
-          name: input.name,
-          email: input.email,
-          headline: input.headline,
-          phone: input.phone,
-          location: input.location,
-          summary: input.summary,
-          skills: input.skills,
-          experience: input.experience,
-          education: input.education,
-          projects: input.projects,
-          links: input.links,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, user.id))
-        .returning();
+    const [updated] = await db
+      .update(users)
+      .set({
+        name: input.name,
+        email: input.email,
+        headline: input.headline,
+        phone: input.phone,
+        location: input.location,
+        summary: input.summary,
+        skills: input.skills,
+        experience: input.experience,
+        education: input.education,
+        projects: input.projects,
+        links: input.links,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id))
+      .returning();
 
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
-      return updated;
-    }),
+    if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+    return updated;
+  }),
 });

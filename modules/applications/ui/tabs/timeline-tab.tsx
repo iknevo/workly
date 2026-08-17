@@ -1,6 +1,11 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+
+import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,16 +22,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
-import { cn } from "@/lib/utils";
-
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
 import { EVENT_TYPE_CONFIG } from "@/modules/applications/constants";
 import { EventFormDialog } from "@/modules/events/ui/event-form-dialog";
-
-import { format } from "date-fns";
-import { Plus, Trash2 } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
 
 export function TimelineTab({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
@@ -44,7 +42,8 @@ export function TimelineTab({ applicationId }: { applicationId: string }) {
         });
         queryClient.invalidateQueries({ queryKey: trpc.events.getManyForMonth.queryKey() });
       },
-      onError: (error) => toast.add({ type: "error", title: "Failed to delete", description: error.message }),
+      onError: (error) =>
+        toast.add({ type: "error", title: "Failed to delete", description: error.message }),
     })
   );
 
@@ -69,7 +68,8 @@ export function TimelineTab({ applicationId }: { applicationId: string }) {
               <EmptyHeader>
                 <EmptyTitle>No events yet</EmptyTitle>
                 <EmptyDescription>
-                  Add interviews, follow-ups, and deadlines to build this application&apos;s timeline.
+                  Add interviews, follow-ups, and deadlines to build this application&apos;s
+                  timeline.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -80,8 +80,8 @@ export function TimelineTab({ applicationId }: { applicationId: string }) {
           {sorted.map((event) => {
             const config = EVENT_TYPE_CONFIG[event.type];
             return (
-              <li key={event.id} className="relative mb-8 last:mb-0">
-                <span className="absolute -left-[31px] flex size-3 items-center justify-center rounded-full border border-border bg-background">
+              <li key={event.id} className="relative mb-8">
+                <span className="absolute -left-7.75 flex size-3 items-center justify-center rounded-full border border-border bg-background">
                   <span className="size-1.5 rounded-full bg-primary" />
                 </span>
                 <div className="flex flex-col gap-1">

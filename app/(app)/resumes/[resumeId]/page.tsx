@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
-
 import { ResumeViewPage } from "@/modules/resumes/ui/resume-view-page";
+import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 
 export default async function ResumeViewRoute({
   params,

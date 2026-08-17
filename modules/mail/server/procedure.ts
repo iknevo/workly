@@ -1,29 +1,30 @@
 import { TRPCError } from "@trpc/server";
-import type { SearchObject } from "imapflow";
 import { and, eq, inArray } from "drizzle-orm";
+import type { SearchObject } from "imapflow";
 import { z } from "zod";
 
-import { env } from "@/config/env";
-import { db } from "@/db";
-import { applications, emailApplications, emails, mailAccounts } from "@/db/schema";
 import {
+  type ScoreContext,
   buildImapSearchQueries,
   companyPhrase,
   evaluateEmail,
   isJunkLabels,
   parseEmailAddress,
-  type ScoreContext,
 } from "@/lib/email-matching";
 import { decrypt, encrypt } from "@/lib/encryption";
 import {
-  formatEnvelopeAddress,
   ImapSession,
+  type MailProvider,
+  formatEnvelopeAddress,
   makeSnippet,
   parseBodyText,
   resolveImapConfig,
   verifyConnection,
-  type MailProvider,
 } from "@/lib/imap";
+
+import { env } from "@/config/env";
+import { db } from "@/db";
+import { applications, emailApplications, emails, mailAccounts } from "@/db/schema";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 const PER_QUERY_EVAL_BUDGET = 100;
@@ -42,9 +43,14 @@ function friendlyImapError(err: unknown, provider: MailProvider): string {
   const responseText = error?.responseText ?? "";
   const lower = `${message} ${responseText}`.toLowerCase();
 
-    if (error?.authenticationFailed || error?.serverResponseCode === "AUTHENTICATIONFAILED" || lower.includes("invalid credentials") || lower.includes("authentication failed")) {
-      return `Sign-in failed for ${provider}. Check the email and app password, and make sure 2-Step Verification is enabled for the account.`;
-    }
+  if (
+    error?.authenticationFailed ||
+    error?.serverResponseCode === "AUTHENTICATIONFAILED" ||
+    lower.includes("invalid credentials") ||
+    lower.includes("authentication failed")
+  ) {
+    return `Sign-in failed for ${provider}. Check the email and app password, and make sure 2-Step Verification is enabled for the account.`;
+  }
   if (
     lower.includes("imap") &&
     (lower.includes("disabled") || lower.includes("not enabled") || lower.includes("permission"))
@@ -109,7 +115,8 @@ async function performSync(userId: string, applicationId: string) {
 
         const uids = await session.search(query as SearchObject);
         totalListed += uids.length;
-        if (totalListed > TOTAL_LIST_CAP) uids.length = Math.max(0, TOTAL_LIST_CAP - (totalListed - uids.length));
+        if (totalListed > TOTAL_LIST_CAP)
+          uids.length = Math.max(0, TOTAL_LIST_CAP - (totalListed - uids.length));
 
         const existingRows =
           uids.length > 0
@@ -122,9 +129,7 @@ async function performSync(userId: string, applicationId: string) {
                   snippet: emails.snippet,
                 })
                 .from(emails)
-                .where(
-                  and(eq(emails.mailAccountId, account.id), inArray(emails.messageUid, uids))
-                )
+                .where(and(eq(emails.mailAccountId, account.id), inArray(emails.messageUid, uids)))
             : [];
         const byUid = new Map(existingRows.map((r) => [r.messageUid, r]));
 
@@ -181,9 +186,7 @@ async function performSync(userId: string, applicationId: string) {
                   snippet: emails.snippet,
                 })
                 .from(emails)
-                .where(
-                  and(eq(emails.mailAccountId, account.id), eq(emails.messageUid, uid))
-                )
+                .where(and(eq(emails.mailAccountId, account.id), eq(emails.messageUid, uid)))
                 .limit(1);
               existing = row ?? undefined;
             }
@@ -341,7 +344,7 @@ export const mailRouter = createTRPCRouter({
   connect: protectedProcedure
     .input(
       z.object({
-        email: z.string().email(),
+        email: z.email(),
         appPassword: z.string().min(1, "App password is required"),
         provider: z.enum(["gmail", "yahoo", "icloud", "imap"]),
         host: z.string().trim().optional(),
@@ -352,8 +355,7 @@ export const mailRouter = createTRPCRouter({
       if (!env.ENCRYPTION_KEY) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            "Email integration is not configured. Add ENCRYPTION_KEY to your environment.",
+          message: "Email integration is not configured. Add ENCRYPTION_KEY to your environment.",
         });
       }
 
@@ -376,9 +378,7 @@ export const mailRouter = createTRPCRouter({
       }
 
       const folder =
-        config.provider === "gmail"
-          ? verified.allMailPath ?? "[Gmail]/All Mail"
-          : config.folder;
+        config.provider === "gmail" ? (verified.allMailPath ?? "[Gmail]/All Mail") : config.folder;
 
       const [account] = await db
         .insert(mailAccounts)
@@ -402,7 +402,11 @@ export const mailRouter = createTRPCRouter({
             updatedAt: new Date(),
           },
         })
-        .returning({ id: mailAccounts.id, email: mailAccounts.email, provider: mailAccounts.provider });
+        .returning({
+          id: mailAccounts.id,
+          email: mailAccounts.email,
+          provider: mailAccounts.provider,
+        });
 
       return account;
     }),
@@ -420,7 +424,7 @@ export const mailRouter = createTRPCRouter({
   }),
 
   disconnect: protectedProcedure
-    .input(z.object({ accountId: z.string().uuid() }))
+    .input(z.object({ accountId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [deleted] = await db
         .delete(mailAccounts)
@@ -431,7 +435,7 @@ export const mailRouter = createTRPCRouter({
     }),
 
   getForApplication: protectedProcedure
-    .input(z.object({ applicationId: z.string().uuid() }))
+    .input(z.object({ applicationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const [application] = await db
         .select({
@@ -475,7 +479,7 @@ export const mailRouter = createTRPCRouter({
     }),
 
   getEmail: protectedProcedure
-    .input(z.object({ emailId: z.string().uuid() }))
+    .input(z.object({ emailId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const [email] = await db
         .select({
@@ -520,7 +524,10 @@ export const mailRouter = createTRPCRouter({
         const fetched = await session.fetch(email.messageUid, { sourceMaxLength: 1_000_000 });
         const bodyText = fetched ? await parseBodyText(fetched.source) : "";
         if (bodyText) {
-          await db.update(emails).set({ bodyText, updatedAt: new Date() }).where(eq(emails.id, email.id));
+          await db
+            .update(emails)
+            .set({ bodyText, updatedAt: new Date() })
+            .where(eq(emails.id, email.id));
         }
         return { bodyText: bodyText || null };
       } catch (err) {
@@ -533,7 +540,7 @@ export const mailRouter = createTRPCRouter({
     }),
 
   markRead: protectedProcedure
-    .input(z.object({ emailId: z.string().uuid() }))
+    .input(z.object({ emailId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [updated] = await db
         .update(emails)
@@ -545,7 +552,7 @@ export const mailRouter = createTRPCRouter({
     }),
 
   updateKeywords: protectedProcedure
-    .input(z.object({ applicationId: z.string().uuid(), keywords: z.array(z.string()) }))
+    .input(z.object({ applicationId: z.uuid(), keywords: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
       const seen = new Set<string>();
       const keywords: string[] = [];
@@ -574,13 +581,13 @@ export const mailRouter = createTRPCRouter({
     }),
 
   sync: protectedProcedure
-    .input(z.object({ applicationId: z.string().uuid() }))
+    .input(z.object({ applicationId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       return performSync(ctx.user.id, input.applicationId);
     }),
 
   rematch: protectedProcedure
-    .input(z.object({ applicationId: z.string().uuid() }))
+    .input(z.object({ applicationId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [application] = await db
         .select({ id: applications.id })
@@ -589,19 +596,19 @@ export const mailRouter = createTRPCRouter({
         .limit(1);
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
-      await db.delete(emailApplications).where(eq(emailApplications.applicationId, input.applicationId));
+      await db
+        .delete(emailApplications)
+        .where(eq(emailApplications.applicationId, input.applicationId));
       return performSync(ctx.user.id, input.applicationId);
     }),
 
   hideEmail: protectedProcedure
-    .input(z.object({ emailId: z.string().uuid(), applicationId: z.string().uuid() }))
+    .input(z.object({ emailId: z.uuid(), applicationId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [application] = await db
         .select({ id: applications.id, mailExclusions: applications.mailExclusions })
         .from(applications)
-        .where(
-          and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id))
-        )
+        .where(and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id)))
         .limit(1);
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -642,14 +649,12 @@ export const mailRouter = createTRPCRouter({
     }),
 
   unhideEmail: protectedProcedure
-    .input(z.object({ emailId: z.string().uuid(), applicationId: z.string().uuid() }))
+    .input(z.object({ emailId: z.uuid(), applicationId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [application] = await db
         .select({ id: applications.id, mailExclusions: applications.mailExclusions })
         .from(applications)
-        .where(
-          and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id))
-        )
+        .where(and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id)))
         .limit(1);
       if (!application) throw new TRPCError({ code: "NOT_FOUND" });
 

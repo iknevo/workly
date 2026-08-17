@@ -29,7 +29,12 @@ export function BasicsTab({ control }: { control: Control<ProfileFormInput> }) {
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel>Email</FieldLabel>
-            <Input {...field} type="email" value={field.value ?? ""} placeholder="you@example.com" />
+            <Input
+              {...field}
+              type="email"
+              value={field.value ?? ""}
+              placeholder="you@example.com"
+            />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
         )}
@@ -40,7 +45,11 @@ export function BasicsTab({ control }: { control: Control<ProfileFormInput> }) {
         render={({ field }) => (
           <Field>
             <FieldLabel>Headline</FieldLabel>
-            <Input {...field} value={field.value ?? ""} placeholder="Senior Software Engineer, 8 years experience" />
+            <Input
+              {...field}
+              value={field.value ?? ""}
+              placeholder="Senior Software Engineer, 8 years experience"
+            />
           </Field>
         )}
       />
@@ -71,7 +80,12 @@ export function BasicsTab({ control }: { control: Control<ProfileFormInput> }) {
           render={({ field }) => (
             <Field>
               <FieldLabel>Summary</FieldLabel>
-              <Textarea {...field} value={field.value ?? ""} placeholder="Short professional summary that opens your resume." rows={4} />
+              <Textarea
+                {...field}
+                value={field.value ?? ""}
+                placeholder="Short professional summary that opens your resume."
+                rows={4}
+              />
             </Field>
           )}
         />

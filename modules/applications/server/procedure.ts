@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateTailoredResume } from "@/lib/ai";
@@ -10,7 +10,6 @@ import { db } from "@/db";
 import {
   applicationResumes,
   applications,
-  events,
   insertApplicationSchema,
   resumes,
   updateApplicationSchema,
@@ -28,23 +27,21 @@ export const applicationsRouter = createTRPCRouter({
       .orderBy(desc(applications.updatedAt));
   }),
 
-  getOne: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      const { user } = ctx;
+  getOne: protectedProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
+    const { user } = ctx;
 
-      const [application] = await db
-        .select()
-        .from(applications)
-        .where(and(eq(applications.id, input.id), eq(applications.userId, user.id)))
-        .limit(1);
+    const [application] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, input.id), eq(applications.userId, user.id)))
+      .limit(1);
 
-      if (!application) throw new TRPCError({ code: "NOT_FOUND" });
-      return application;
-    }),
+    if (!application) throw new TRPCError({ code: "NOT_FOUND" });
+    return application;
+  }),
 
   getResumes: protectedProcedure
-    .input(z.object({ applicationId: z.string().uuid() }))
+    .input(z.object({ applicationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const { user } = ctx;
 
@@ -64,7 +61,7 @@ export const applicationsRouter = createTRPCRouter({
     }),
 
   getResume: protectedProcedure
-    .input(z.object({ resumeId: z.string().uuid(), applicationId: z.string().uuid() }))
+    .input(z.object({ resumeId: z.uuid(), applicationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const { user } = ctx;
 
@@ -118,7 +115,7 @@ export const applicationsRouter = createTRPCRouter({
     }),
 
   update: protectedProcedure
-    .input(updateApplicationSchema.extend({ id: z.string().uuid() }))
+    .input(updateApplicationSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { user } = ctx;
 
@@ -163,25 +160,23 @@ export const applicationsRouter = createTRPCRouter({
       return updated;
     }),
 
-  remove: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      const { user } = ctx;
+  remove: protectedProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
+    const { user } = ctx;
 
-      const [deleted] = await db
-        .delete(applications)
-        .where(and(eq(applications.id, input.id), eq(applications.userId, user.id)))
-        .returning();
+    const [deleted] = await db
+      .delete(applications)
+      .where(and(eq(applications.id, input.id), eq(applications.userId, user.id)))
+      .returning();
 
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
-      return deleted;
-    }),
+    if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
+    return deleted;
+  }),
 
   generateResume: protectedProcedure
     .input(
       z.object({
-        applicationId: z.string().uuid(),
-        baseResumeId: z.string().uuid().optional(),
+        applicationId: z.uuid(),
+        baseResumeId: z.uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -257,7 +252,7 @@ export const applicationsRouter = createTRPCRouter({
     }),
 
   deleteResume: protectedProcedure
-    .input(z.object({ resumeId: z.string().uuid() }))
+    .input(z.object({ resumeId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { user } = ctx;
 

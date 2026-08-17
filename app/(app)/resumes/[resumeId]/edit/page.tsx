@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
-
 import { EditResumePage } from "@/modules/resumes/ui/edit-resume-page";
+import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 
 export default async function EditResumeRoute({
   params,

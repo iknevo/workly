@@ -247,8 +247,8 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
               Sync
             </TooltipTrigger>
             <TooltipContent>
-              Scan your inbox for new emails matching this application. Adds new matches and
-              removes ones that no longer match, without clearing your current matches.
+              Scan your inbox for new emails matching this application. Adds new matches and removes
+              ones that no longer match, without clearing your current matches.
             </TooltipContent>
           </Tooltip>
         </div>
@@ -317,7 +317,10 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="flex items-center gap-2">
                     {!email.isRead && (
-                      <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+                      <span
+                        className="size-2 shrink-0 rounded-full bg-primary"
+                        aria-label="Unread"
+                      />
                     )}
                     <span
                       className={`truncate ${email.isRead ? "font-medium text-muted-foreground" : "font-semibold"}`}
@@ -326,7 +329,9 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                     </span>
                   </span>
                   <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-xs text-muted-foreground">{email.fromEmail}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {email.fromEmail}
+                    </span>
                     {accountEmail ? (
                       <Badge
                         variant="outline"
@@ -393,7 +398,9 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm">{email.subject || "(no subject)"}</span>
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-xs text-muted-foreground">{email.fromEmail}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {email.fromEmail}
+                      </span>
                       {accountEmail ? (
                         <Badge
                           variant="outline"
@@ -432,9 +439,7 @@ export function EmailsTab({ applicationId }: { applicationId: string }) {
       <EmailPreviewDrawer
         email={selectedEmail}
         applicationId={applicationId}
-        accountEmail={
-          selectedEmail ? accountEmailById.get(selectedEmail.mailAccountId) : undefined
-        }
+        accountEmail={selectedEmail ? accountEmailById.get(selectedEmail.mailAccountId) : undefined}
         onOpenChange={(open) => {
           if (!open) setSelectedEmail(null);
         }}

@@ -87,10 +87,13 @@ export function Dashboard() {
   const me = meQuery.data;
 
   const byStatus = useMemo(() => {
-    return applications.reduce<Record<Status, number>>((acc, app) => {
-      acc[app.status] = (acc[app.status] ?? 0) + 1;
-      return acc;
-    }, {} as Record<Status, number>);
+    return applications.reduce<Record<Status, number>>(
+      (acc, app) => {
+        acc[app.status] = (acc[app.status] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<Status, number>
+    );
   }, [applications]);
 
   const total = applications.length;
@@ -228,13 +231,13 @@ export function Dashboard() {
                         className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className={cn("size-2 shrink-0 rounded-full", SEGMENT_BG[status])} />
+                          <span
+                            className={cn("size-2 shrink-0 rounded-full", SEGMENT_BG[status])}
+                          />
                           <span className="truncate text-sm">{config.label}</span>
                         </div>
                         <div className="flex shrink-0 items-center gap-2 tabular-nums">
-                          {count > 0 ? (
-                            <span className="text-sm font-medium">{count}</span>
-                          ) : null}
+                          {count > 0 ? <span className="text-sm font-medium">{count}</span> : null}
                           <span className="text-xs text-muted-foreground">{pct}%</span>
                         </div>
                       </Link>
@@ -317,7 +320,6 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
-
       </div>
 
       <Card>
@@ -334,9 +336,15 @@ export function Dashboard() {
           ) : (
             <div className="flex flex-col gap-5">
               <div className="flex items-center gap-4">
-                <Progress value={profileScore} className="flex-1 [&_[data-slot=progress-track]]:h-2" />
+                <Progress
+                  value={profileScore}
+                  className="flex-1 **:data-[slot=progress-track]:h-2"
+                />
                 <span className="shrink-0 text-sm font-medium tabular-nums">{profileScore}%</span>
-                <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                <Link
+                  href="/profile"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
                   <UserRound />
                   Complete profile
                 </Link>
@@ -365,8 +373,12 @@ export function Dashboard() {
               </div>
               {profileScore < 100 && (
                 <p className="text-xs text-muted-foreground">
-                  {PROFILE_SECTIONS.length - Math.round((profileScore / 100) * PROFILE_SECTIONS.length)} section
-                  {PROFILE_SECTIONS.length - Math.round((profileScore / 100) * PROFILE_SECTIONS.length) === 1
+                  {PROFILE_SECTIONS.length -
+                    Math.round((profileScore / 100) * PROFILE_SECTIONS.length)}{" "}
+                  section
+                  {PROFILE_SECTIONS.length -
+                    Math.round((profileScore / 100) * PROFILE_SECTIONS.length) ===
+                  1
                     ? ""
                     : "s"}{" "}
                   to fill in to reach a full profile.

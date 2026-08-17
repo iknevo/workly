@@ -25,8 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 
-import { useConfirm } from "@/hooks/use-confirm";
 import { normalizeSkills } from "@/db/schema";
+import { useConfirm } from "@/hooks/use-confirm";
 import { ResumeCodeViewer } from "@/modules/resumes/ui/resume-code-viewer";
 import { useTRPC } from "@/trpc/client";
 
@@ -279,19 +279,22 @@ function ResumePdfPreview({ content }: { content: string }) {
 
   useEffect(() => {
     if (!content.trim()) return;
-    compile.mutate({ content }, {
-      onSuccess: (result) => {
-        const bytes = Uint8Array.from(atob(result.pdfBase64), (c) => c.charCodeAt(0));
-        const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-        urlRef.current = url;
-        setPreviewUrl(url);
-        setError(null);
-      },
-      onError: (compileError) => {
-        setError(compileError.message.slice(0, 300));
-      },
-    });
+    compile.mutate(
+      { content },
+      {
+        onSuccess: (result) => {
+          const bytes = Uint8Array.from(atob(result.pdfBase64), (c) => c.charCodeAt(0));
+          const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+          if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+          urlRef.current = url;
+          setPreviewUrl(url);
+          setError(null);
+        },
+        onError: (compileError) => {
+          setError(compileError.message.slice(0, 300));
+        },
+      }
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content]);
 

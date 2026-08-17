@@ -213,7 +213,7 @@ export function ResumeEditor({
                   {...field}
                   id="resume-content"
                   value={field.value}
-                  className="h-[420px] min-h-[420px] resize-none font-mono text-xs leading-relaxed lg:h-[calc(100vh-260px)]"
+                  className="h-105 min-h-105 resize-none font-mono text-xs leading-relaxed lg:h-[calc(100vh-260px)]"
                 />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>

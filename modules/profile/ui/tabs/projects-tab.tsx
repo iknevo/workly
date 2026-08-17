@@ -1,14 +1,13 @@
 "use client";
 
+import { ProjectFields, SectionCard } from "../editors";
+import { Plus } from "lucide-react";
 import { useFieldArray } from "react-hook-form";
 import type { Control } from "react-hook-form";
-import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 import type { ProfileFormInput, ProfileProjectInput } from "@/db/schema";
-
-import { ProjectFields, SectionCard } from "../editors";
 
 const emptyProject = (): ProfileProjectInput => ({
   name: "",

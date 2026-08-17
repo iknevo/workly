@@ -1,10 +1,11 @@
-import { and, desc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+
+import { compileLatex } from "@/lib/latex";
 
 import { db } from "@/db";
 import { insertResumeSchema, resumes, updateResumeSchema } from "@/db/schema";
-import { compileLatex } from "@/lib/latex";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const resumesRouter = createTRPCRouter({
@@ -18,70 +19,66 @@ export const resumesRouter = createTRPCRouter({
       .orderBy(desc(resumes.updatedAt));
   }),
 
-  getOne: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      const { user } = ctx;
+  getOne: protectedProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
+    const { user } = ctx;
 
-      const [resume] = await db
-        .select()
-        .from(resumes)
-        .where(and(eq(resumes.id, input.id), eq(resumes.userId, user.id)))
-        .limit(1);
+    const [resume] = await db
+      .select()
+      .from(resumes)
+      .where(and(eq(resumes.id, input.id), eq(resumes.userId, user.id)))
+      .limit(1);
 
-      if (!resume) throw new TRPCError({ code: "NOT_FOUND" });
-      return resume;
-    }),
+    if (!resume) throw new TRPCError({ code: "NOT_FOUND" });
+    return resume;
+  }),
 
   create: protectedProcedure
     .input(insertResumeSchema.omit({ userId: true }))
     .mutation(async ({ ctx, input }) => {
-    const { user } = ctx;
+      const { user } = ctx;
 
-    const [resume] = await db
-      .insert(resumes)
-      .values({
-        userId: user.id,
-        title: input.title,
-        content: input.content,
-      })
-      .returning();
+      const [resume] = await db
+        .insert(resumes)
+        .values({
+          userId: user.id,
+          title: input.title,
+          content: input.content,
+        })
+        .returning();
 
-    return resume;
-  }),
+      return resume;
+    }),
 
   update: protectedProcedure
-    .input(updateResumeSchema.extend({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-    const { user } = ctx;
-
-    const [updated] = await db
-      .update(resumes)
-      .set({
-        title: input.title,
-        content: input.content,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(resumes.id, input.id), eq(resumes.userId, user.id)))
-      .returning();
-
-    if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
-    return updated;
-  }),
-
-  remove: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(updateResumeSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { user } = ctx;
 
-      const [deleted] = await db
-        .delete(resumes)
+      const [updated] = await db
+        .update(resumes)
+        .set({
+          title: input.title,
+          content: input.content,
+          updatedAt: new Date(),
+        })
         .where(and(eq(resumes.id, input.id), eq(resumes.userId, user.id)))
         .returning();
 
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
-      return deleted;
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return updated;
     }),
+
+  remove: protectedProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
+    const { user } = ctx;
+
+    const [deleted] = await db
+      .delete(resumes)
+      .where(and(eq(resumes.id, input.id), eq(resumes.userId, user.id)))
+      .returning();
+
+    if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
+    return deleted;
+  }),
 
   compile: protectedProcedure
     .input(z.object({ content: z.string().min(1) }))

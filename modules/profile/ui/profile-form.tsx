@@ -17,15 +17,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { normalizeSkills, profileUpdateSchema } from "@/db/schema";
-import type { ProfileFormInput, ProfileProject, UserProfile } from "@/db/schema";
-
 import { BasicsTab } from "./tabs/basics-tab";
 import { EducationTab } from "./tabs/education-tab";
 import { ExperienceTab } from "./tabs/experience-tab";
 import { LinksTab } from "./tabs/links-tab";
 import { ProjectsTab } from "./tabs/projects-tab";
 import { SkillsTab } from "./tabs/skills-tab";
+import { normalizeSkills, profileUpdateSchema } from "@/db/schema";
+import type { ProfileFormInput, ProfileProject, UserProfile } from "@/db/schema";
 
 const toProjectInput = (p: ProfileProject): ProfileFormInput["projects"][number] => ({
   name: p.name,

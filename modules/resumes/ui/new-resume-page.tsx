@@ -1,14 +1,13 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { ResumeEditor } from "./resume-editor";
-
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 
 export function NewResumePage() {
   const router = useRouter();
@@ -30,7 +29,9 @@ export function NewResumePage() {
       <Card>
         <CardHeader>
           <CardTitle>LaTeX source</CardTitle>
-          <CardDescription>Preview the PDF as you write, then save it as a base resume.</CardDescription>
+          <CardDescription>
+            Preview the PDF as you write, then save it as a base resume.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ResumeEditor onDone={() => router.push("/resumes")} />

@@ -100,7 +100,10 @@ export function escapeLatex(text: string): string {
     [/</g, "\\textless{}"],
     [/>/g, "\\textgreater{}"],
   ];
-  return replacements.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), text);
+  return replacements.reduce(
+    (out, [pattern, replacement]) => out.replace(pattern, replacement),
+    text
+  );
 }
 
 function escapeLatexUrl(url: string): string {
@@ -113,16 +116,19 @@ function escapeLatexUrl(url: string): string {
     [/\^/g, "\\textasciicircum{}"],
     [/_/g, "\\_"],
   ];
-  return replacements.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), url);
+  return replacements.reduce(
+    (out, [pattern, replacement]) => out.replace(pattern, replacement),
+    url
+  );
 }
 
 export function hasResumeData(profile: ResumeProfile): boolean {
   return Boolean(
     profile.name?.trim() ||
-      profile.experience?.length ||
-      normalizeSkills(profile.skills).some((g) => g.items.length) ||
-      profile.projects?.length ||
-      profile.education?.length
+    profile.experience?.length ||
+    normalizeSkills(profile.skills).some((g) => g.items.length) ||
+    profile.projects?.length ||
+    profile.education?.length
   );
 }
 
@@ -188,9 +194,7 @@ export function buildResumeLatex(profile: ResumeProfile): string {
         const expLocation = exp.location?.trim() ? escapeLatex(exp.location.trim()) : "";
         const period = [exp.startDate?.trim(), exp.endDate?.trim()].filter(Boolean).join(" --- ");
         const lines: string[] = [];
-        lines.push(
-          `\\experience{${role}}{${period || " "}}{${company}}{${expLocation || " "}}`
-        );
+        lines.push(`\\experience{${role}}{${period || " "}}{${company}}{${expLocation || " "}}`);
         const bullets: string[] = [];
         if (exp.summary?.trim()) bullets.push(escapeLatex(exp.summary.trim()));
         for (const bullet of exp.bullets ?? []) {
@@ -203,7 +207,7 @@ export function buildResumeLatex(profile: ResumeProfile): string {
           );
         }
         const projects = (exp.projects ?? [])
-          .map((project) => project.name.trim() ? project : null)
+          .map((project) => (project.name.trim() ? project : null))
           .filter((project): project is NonNullable<typeof project> => project !== null);
         if (projects.length) {
           const projectItems = projects.map((project) => {
@@ -287,7 +291,10 @@ export function buildResumeLatex(profile: ResumeProfile): string {
   if (skills.length) {
     sections.push(
       `\\section{Skills \\& Tools}\n${skills
-        .map((group) => `\\textbf{${escapeLatex(group.category)}:} ${escapeLatex(group.items.join(", "))} \\\\`)
+        .map(
+          (group) =>
+            `\\textbf{${escapeLatex(group.category)}:} ${escapeLatex(group.items.join(", "))} \\\\`
+        )
         .join("\n")}`
     );
   }

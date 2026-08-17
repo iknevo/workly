@@ -1,14 +1,13 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 
-import { useTRPC } from "@/trpc/client";
-import { useMutation } from "@tanstack/react-query";
-
 import { ApplicationForm } from "./application-form";
+import { useTRPC } from "@/trpc/client";
 
 export function NewApplication() {
   const router = useRouter();
@@ -21,7 +20,11 @@ export function NewApplication() {
         router.push(`/applications/${application.id}`);
       },
       onError: (error) => {
-        toast.add({ type: "error", title: "Failed to create application", description: error.message });
+        toast.add({
+          type: "error",
+          title: "Failed to create application",
+          description: error.message,
+        });
       },
     })
   );
@@ -31,7 +34,8 @@ export function NewApplication() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">New application</h1>
         <p className="text-sm text-muted-foreground">
-          Add a job you&apos;re applying to and paste the description for AI-powered resume tailoring.
+          Add a job you&apos;re applying to and paste the description for AI-powered resume
+          tailoring.
         </p>
       </div>
 

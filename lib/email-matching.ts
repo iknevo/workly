@@ -42,14 +42,14 @@ export function buildSearchQueries({
   exclusions?: string[];
 }): string[] {
   const phrase = companyPhrase(company);
-  const normalized = keywords
-    .map((k) => k.trim().toLowerCase())
-    .filter(Boolean);
-  const domainKeywords = normalized.filter(isDomainKeyword).map((k) =>
-    k.replace(/[^a-z0-9.\-]/g, "")
-  );
-  const textTerms = [phrase, ...normalized.filter((k) => !isDomainKeyword(k)).map(sanitizePhrase)]
-    .filter((t) => t.length > 0);
+  const normalized = keywords.map((k) => k.trim().toLowerCase()).filter(Boolean);
+  const domainKeywords = normalized
+    .filter(isDomainKeyword)
+    .map((k) => k.replace(/[^a-z0-9.\-]/g, ""));
+  const textTerms = [
+    phrase,
+    ...normalized.filter((k) => !isDomainKeyword(k)).map(sanitizePhrase),
+  ].filter((t) => t.length > 0);
 
   const exclusionClause = exclusions
     .map((e) => e.trim().toLowerCase())
@@ -95,15 +95,13 @@ export function buildImapSearchQueries({
   gmail?: boolean;
 }): ImapSearchQuery[] {
   if (gmail) {
-    return buildSearchQueries({ company, keywords, exclusions }).map(
-      (query) => ({ gmraw: query })
-    );
+    return buildSearchQueries({ company, keywords, exclusions }).map((query) => ({ gmraw: query }));
   }
 
   const normalized = keywords.map((k) => k.trim().toLowerCase()).filter(Boolean);
-  const domainKeywords = normalized.filter(isDomainKeyword).map((k) =>
-    k.replace(/[^a-z0-9.\-]/g, "")
-  );
+  const domainKeywords = normalized
+    .filter(isDomainKeyword)
+    .map((k) => k.replace(/[^a-z0-9.\-]/g, ""));
   const textTerms = [
     companyPhrase(company),
     ...normalized.filter((k) => !isDomainKeyword(k)).map(sanitizePhrase),

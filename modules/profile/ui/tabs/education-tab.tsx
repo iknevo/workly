@@ -1,16 +1,15 @@
 "use client";
 
-import { useFieldArray, Controller } from "react-hook-form";
-import type { Control } from "react-hook-form";
+import { Field, SectionCard } from "../editors";
 import { Plus } from "lucide-react";
+import { Controller, useFieldArray } from "react-hook-form";
+import type { Control } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { ProfileEducationInput, ProfileFormInput } from "@/db/schema";
-
-import { Field, SectionCard } from "../editors";
 
 const emptyEducation = (): ProfileEducationInput => ({
   school: "",
@@ -116,7 +115,12 @@ function EducationEntry({
         control={control}
         render={({ field }) => (
           <Field label="Notes">
-            <Textarea {...field} value={field.value ?? ""} placeholder="GPA, honors, relevant coursework..." rows={2} />
+            <Textarea
+              {...field}
+              value={field.value ?? ""}
+              placeholder="GPA, honors, relevant coursework..."
+              rows={2}
+            />
           </Field>
         )}
       />
