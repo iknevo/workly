@@ -85,6 +85,7 @@ export const profileEducationSchema = z
     startYear: z.string().trim().max(20).nullable(),
     endYear: z.string().trim().max(20).nullable(),
     notes: z.string().trim().max(2000).nullable(),
+    projects: z.array(profileProjectSchema),
   })
   .transform((e) => ({
     school: e.school,
@@ -93,6 +94,7 @@ export const profileEducationSchema = z
     startYear: e.startYear || null,
     endYear: e.endYear || null,
     notes: e.notes || null,
+    projects: e.projects.filter((p) => p.name),
   }));
 
 export const profileSkillsSchema = z.array(
@@ -206,6 +208,7 @@ export const users = pgTable(
     education: jsonb("education").$type<ProfileEducation[]>(),
     projects: jsonb("projects").$type<ProfileProject[]>(),
     links: jsonb("links").$type<ProfileLink[]>(),
+    aiApiKey: text("ai_api_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -503,21 +506,25 @@ export const selectUserSchema = createSelectSchema(users);
 
 export const insertResumeSchema = createInsertSchema(resumes, {
   title: (s) => s.trim().min(1, "Title is required").max(200, "Title is too long"),
-  content: (s) => s.min(1, "Resume content is required"),
+  content: (s) => s.min(1, "Resume content is required").max(100000, "Resume content is too long"),
 });
 export const updateResumeSchema = createUpdateSchema(resumes, {
   title: (s) => s.trim().min(1, "Title is required").max(200, "Title is too long"),
-  content: (s) => s.min(1, "Resume content is required"),
+  content: (s) => s.min(1, "Resume content is required").max(100000, "Resume content is too long"),
 });
 export const selectResumeSchema = createSelectSchema(resumes);
 
 export const insertApplicationSchema = createInsertSchema(applications, {
   company: (s) => s.trim().min(1, "Company is required").max(200, "Company is too long"),
   position: (s) => s.trim().min(1, "Position is required").max(200, "Position is too long"),
+  jobDescription: (s) => s.trim().max(50000, "Job description is too long"),
+  notes: (s) => s.trim().max(50000, "Notes are too long"),
 });
 export const updateApplicationSchema = createUpdateSchema(applications, {
   company: (s) => s.trim().min(1, "Company is required").max(200, "Company is too long"),
   position: (s) => s.trim().min(1, "Position is required").max(200, "Position is too long"),
+  jobDescription: (s) => s.trim().max(50000, "Job description is too long"),
+  notes: (s) => s.trim().max(50000, "Notes are too long"),
 });
 export const selectApplicationSchema = createSelectSchema(applications);
 

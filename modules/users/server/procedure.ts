@@ -1,5 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+
+import { encrypt } from "@/lib/encryption";
 
 import { db } from "@/db";
 import { profileUpdateSchema, updateUserSchema, users } from "@/db/schema";
@@ -10,6 +13,26 @@ export const usersRouter = createTRPCRouter({
     const { user } = ctx;
     return user;
   }),
+
+  getApiKeyStatus: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ aiApiKey: users.aiApiKey })
+      .from(users)
+      .where(eq(users.id, ctx.user.id))
+      .limit(1);
+    return { hasKey: !!row?.aiApiKey };
+  }),
+
+  updateApiKey: protectedProcedure
+    .input(z.object({ apiKey: z.string().trim() }))
+    .mutation(async ({ ctx, input }) => {
+      const encrypted = input.apiKey ? encrypt(input.apiKey) : null;
+      await db
+        .update(users)
+        .set({ aiApiKey: encrypted, updatedAt: new Date() })
+        .where(eq(users.id, ctx.user.id));
+      return { success: true };
+    }),
 
   updateMe: protectedProcedure
     .input(

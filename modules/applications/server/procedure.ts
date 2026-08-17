@@ -3,9 +3,11 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateTailoredResume } from "@/lib/ai";
+import { decrypt } from "@/lib/encryption";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { buildResumeLatex, hasResumeData } from "@/lib/resume";
 
+import { env } from "@/config/env";
 import { db } from "@/db";
 import {
   applicationResumes,
@@ -13,6 +15,7 @@ import {
   insertApplicationSchema,
   resumes,
   updateApplicationSchema,
+  users,
 } from "@/db/schema";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -108,6 +111,7 @@ export const applicationsRouter = createTRPCRouter({
           notes: input.notes || null,
           baseResumeId: input.baseResumeId || null,
           mailKeywords: (input.mailKeywords as string[] | undefined) ?? [],
+          mailExclusions: (input.mailExclusions as string[] | undefined) ?? [],
         })
         .returning();
 
@@ -131,6 +135,7 @@ export const applicationsRouter = createTRPCRouter({
         notes?: string | null;
         baseResumeId?: string | null;
         mailKeywords?: string[];
+        mailExclusions?: string[];
         updatedAt: Date;
       } = {
         company: input.company,
@@ -148,6 +153,10 @@ export const applicationsRouter = createTRPCRouter({
 
       if (input.mailKeywords !== undefined) {
         set.mailKeywords = (input.mailKeywords as string[] | undefined) ?? [];
+      }
+
+      if (input.mailExclusions !== undefined) {
+        set.mailExclusions = (input.mailExclusions as string[] | undefined) ?? [];
       }
 
       const [updated] = await db
@@ -230,12 +239,30 @@ export const applicationsRouter = createTRPCRouter({
         });
       }
 
-      const content = await generateTailoredResume({
-        baseResume: baseContent,
-        jobDescription: application.jobDescription,
-        company: application.company,
-        position: application.position,
-      });
+      const [userRow] = await db
+        .select({ aiApiKey: users.aiApiKey })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1);
+
+      const userApiKey = userRow?.aiApiKey ? decrypt(userRow.aiApiKey) : null;
+
+      if (!userApiKey && !env.GROQ_API_KEY) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Add your Groq API key in Settings to use AI resume tailoring.",
+        });
+      }
+
+      const content = await generateTailoredResume(
+        {
+          baseResume: baseContent,
+          jobDescription: application.jobDescription,
+          company: application.company,
+          position: application.position,
+        },
+        userApiKey ?? undefined
+      );
 
       const [applicationResume] = await db
         .insert(applicationResumes)
@@ -243,7 +270,7 @@ export const applicationsRouter = createTRPCRouter({
           applicationId: application.id,
           baseResumeId,
           content,
-          model: "llama-3.3-70b-versatile",
+          model: "openai/gpt-oss-120b",
           jobDescriptionSnapshot: application.jobDescription,
         })
         .returning();

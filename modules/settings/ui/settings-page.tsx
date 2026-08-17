@@ -1,10 +1,20 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Info, KeyRound, Mail, Trash2, UserRound } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Info,
+  KeyRound,
+  Mail,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { SubmitEventHandler, useState } from "react";
+import { type SubmitEventHandler, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -59,6 +69,125 @@ const PROVIDER_GUIDES: Record<
     ],
   },
 };
+
+function ApiKeySection() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const statusQuery = useQuery(trpc.users.getApiKeyStatus.queryOptions());
+  const hasKey = statusQuery.data?.hasKey ?? false;
+
+  const [key, setKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const saveMutation = useMutation(
+    trpc.users.updateApiKey.mutationOptions({
+      onSuccess: () => {
+        setKey("");
+        setShowKey(false);
+        queryClient.invalidateQueries({ queryKey: trpc.users.getApiKeyStatus.queryKey() });
+        toast.add({ title: "API key saved" });
+      },
+    })
+  );
+
+  const handleSave = () => {
+    if (!key.trim()) return;
+    setSaving(true);
+    saveMutation.mutate({ apiKey: key.trim() }, { onSettled: () => setSaving(false) });
+  };
+
+  const handleClear = () => {
+    setSaving(true);
+    saveMutation.mutate({ apiKey: "" }, { onSettled: () => setSaving(false) });
+  };
+
+  return (
+    <div className="flex flex-col gap-3 py-4">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium">AI API Key</span>
+        <span className="text-xs text-muted-foreground">
+          Your Groq API key for AI resume tailoring. Get one free at console.groq.com.
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Input
+            type={showKey ? "text" : "password"}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder={hasKey ? "••••••••••••••••" : "gsk_..."}
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => setShowKey((s) => !s)}
+            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label={showKey ? "Hide key" : "Show key"}
+          >
+            {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
+        <Button size="sm" onClick={handleSave} disabled={!key.trim() || saving}>
+          Save
+        </Button>
+        {hasKey && (
+          <Button size="sm" variant="outline" onClick={handleClear} disabled={saving}>
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {hasKey && !key && (
+        <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="size-3.5" />
+          Key saved
+        </div>
+      )}
+
+      <Popover>
+        <PopoverTrigger className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+          <Info className="size-3.5" />
+          How to get a Groq API key
+        </PopoverTrigger>
+        <PopoverContent className="w-80">
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold">Get a Groq API key</span>
+            <ol className="flex list-decimal flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
+              <li>
+                Go to{" "}
+                <a
+                  href="https://console.groq.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline underline-offset-2"
+                >
+                  console.groq.com
+                </a>
+              </li>
+              <li>Sign up or log in (free, no credit card required).</li>
+              <li>Click &quot;API Keys&quot; in the left sidebar.</li>
+              <li>Click &quot;Create API Key&quot;.</li>
+              <li>Copy the key (it starts with gsk_).</li>
+              <li>Paste it above and click Save.</li>
+            </ol>
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary underline underline-offset-2"
+            >
+              Open Groq Console
+              <ExternalLink className="size-3" />
+            </a>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 export function SettingsPage() {
   const trpc = useTRPC();
@@ -159,6 +288,8 @@ export function SettingsPage() {
             </Link>
           </div>
 
+          <ApiKeySection />
+
           <div className="flex flex-col gap-4 py-4 last:pb-0">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium">Email</span>
@@ -244,7 +375,7 @@ export function SettingsPage() {
                               <a
                                 href={guide.url}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs font-medium text-primary underline underline-offset-2"
                               >
                                 {guide.urlLabel}

@@ -3,9 +3,9 @@ import { generateText } from "ai";
 
 import { env } from "@/config/env";
 
-const groq = env.GROQ_API_KEY ? createGroq({ apiKey: env.GROQ_API_KEY }) : null;
+const serverGroq = env.GROQ_API_KEY ? createGroq({ apiKey: env.GROQ_API_KEY }) : null;
 
-export const RESUME_MODEL = "llama-3.3-70b-versatile";
+export const RESUME_MODEL = "openai/gpt-oss-120b";
 export const RESUME_MAX_OUTPUT_TOKENS = 4096;
 export const RESUME_MAX_JOB_DESCRIPTION_CHARS = 8000;
 export const RESUME_MAX_RESUME_CHARS = 16000;
@@ -16,7 +16,7 @@ function truncate(text: string, maxChars: number): string {
 }
 
 export function isAIEnabled(): boolean {
-  return groq !== null;
+  return serverGroq !== null;
 }
 
 export interface GenerateResumeInput {
@@ -40,10 +40,16 @@ Rules:
 - The resume should fit on one to two pages.
 - Output ONLY the raw LaTeX source. No markdown fences, no commentary, no explanation. Start with \\documentclass and end with \\end{document}.`;
 
-export async function generateTailoredResume(input: GenerateResumeInput): Promise<string> {
-  if (!groq) {
-    throw new Error("GROQ_API_KEY is not configured");
+export async function generateTailoredResume(
+  input: GenerateResumeInput,
+  userApiKey?: string
+): Promise<string> {
+  const key = userApiKey || env.GROQ_API_KEY;
+  if (!key) {
+    throw new Error("AI API key is not configured. Add your Groq API key in Settings.");
   }
+
+  const groqClient = userApiKey ? createGroq({ apiKey: userApiKey }) : serverGroq!;
 
   const { baseResume, jobDescription, company, position } = input;
 
@@ -59,7 +65,7 @@ ${truncate(baseResume, RESUME_MAX_RESUME_CHARS)}
 Rewrite the resume above so it is tailored to this job. Output only the LaTeX source.`;
 
   const { text } = await generateText({
-    model: groq(RESUME_MODEL),
+    model: groqClient(RESUME_MODEL),
     system: SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.4,
