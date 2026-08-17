@@ -15,6 +15,10 @@ export const aiRateLimit = redis
   ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, "60s") })
   : null;
 
+export const generalRateLimit = redis
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, "60s") })
+  : null;
+
 export async function checkRateLimit(
   key: string,
   limiter: Ratelimit | null = aiRateLimit

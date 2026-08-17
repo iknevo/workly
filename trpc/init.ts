@@ -3,6 +3,8 @@ import { TRPCError, initTRPC } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import superjson from "superjson";
 
+import { checkRateLimit, generalRateLimit } from "@/lib/rate-limit";
+
 import { db } from "@/db";
 import { users } from "@/db/schema";
 
@@ -14,9 +16,6 @@ export const createTRPCContext = async () => {
 export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 const t = initTRPC.context<Context>().create({
-  /**
-   * @see https://trpc.io/docs/server/data-transformers
-   */
   transformer: superjson,
 });
 
@@ -36,6 +35,14 @@ export const protectedProcedure = t.procedure.use(async function isAuthed(opts) 
 
   if (!user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const rateLimit = await checkRateLimit(`general:${user.id}`, generalRateLimit);
+  if (!rateLimit.success) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Rate limit exceeded. Please try again later.",
+    });
   }
 
   return opts.next({
