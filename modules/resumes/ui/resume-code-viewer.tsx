@@ -27,7 +27,7 @@ export function ResumeCodeViewer({ content }: { content: string }) {
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="max-h-96 overflow-auto rounded-lg bg-muted/50 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+      <pre className="max-h-[65vh] overflow-auto rounded-lg bg-muted/50 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
         {content}
       </pre>
     </div>

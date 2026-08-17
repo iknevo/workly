@@ -67,7 +67,7 @@ export function ResumeViewPage({ resumeId }: { resumeId: string }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => compile.mutate({ content: resume.content })}
+              onClick={() => compile.mutate({ resumeId: resume.id })}
               disabled={compile.isPending}
             >
               {compile.isPending ? <Loader2 className="animate-spin" /> : <Eye />}
@@ -84,8 +84,8 @@ export function ResumeViewPage({ resumeId }: { resumeId: string }) {
         )}
       </div>
 
-      <Card>
-        <CardContent className="p-4">
+      <Card className="p-0">
+        <CardContent className="p-2">
           {resumeQuery.isLoading || !resume ? (
             <Skeleton className="h-96 w-full" />
           ) : (

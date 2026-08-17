@@ -81,9 +81,24 @@ export const resumesRouter = createTRPCRouter({
   }),
 
   compile: protectedProcedure
-    .input(z.object({ content: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      const result = await compileLatex(input.content);
+    .input(z.union([z.object({ resumeId: z.uuid() }), z.object({ content: z.string().min(1) })]))
+    .mutation(async ({ ctx, input }) => {
+      const { user } = ctx;
+
+      let content: string;
+      if ("resumeId" in input) {
+        const [resume] = await db
+          .select()
+          .from(resumes)
+          .where(and(eq(resumes.id, input.resumeId), eq(resumes.userId, user.id)))
+          .limit(1);
+        if (!resume) throw new TRPCError({ code: "NOT_FOUND" });
+        content = resume.content;
+      } else {
+        content = input.content;
+      }
+
+      const result = await compileLatex(content);
       if (!result.ok) {
         throw new TRPCError({
           code: "BAD_REQUEST",

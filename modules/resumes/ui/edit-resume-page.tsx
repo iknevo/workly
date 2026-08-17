@@ -22,10 +22,7 @@ export function EditResumePage({ resumeId }: { resumeId: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <Link
-          href={`/resumes/${resumeId}`}
-          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-        >
+        <Link href={"/resumes"} className={buttonVariants({ variant: "ghost", size: "icon-sm" })}>
           <ArrowLeft />
         </Link>
         <div>

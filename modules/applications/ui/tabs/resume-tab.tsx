@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Settings, Sparkles, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
 
   const resumesQuery = useQuery(trpc.resumes.getMany.queryOptions());
   const profileQuery = useQuery(trpc.users.getMe.queryOptions());
+  const apiKeyQuery = useQuery(trpc.users.getApiKeyStatus.queryOptions());
   const applicationResumesQuery = useQuery(
     trpc.applications.getResumes.queryOptions({ applicationId })
   );
@@ -59,6 +61,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
     profile?.education?.length
   );
   const hasBaseResume = Boolean(selectedBaseResume);
+  const hasApiKey = apiKeyQuery.data?.hasKey ?? false;
 
   const generate = useMutation(
     trpc.applications.generateResume.mutationOptions({
@@ -144,19 +147,33 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
                   baseResumeId: selectedBaseResume || undefined,
                 })
               }
-              disabled={generate.isPending}
+              disabled={generate.isPending || !hasApiKey}
             >
               {generate.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
               {hasBaseResume ? "Generate tailored resume" : "Generate from my profile"}
             </Button>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {hasBaseResume
-              ? `The AI will rewrite "${formattedResumes.find((r) => r.value === selectedBaseResume)?.label ?? ""}" to match this job.`
-              : profileHasData
-                ? "No base resume selected — the AI builds from your profile."
-                : "Your profile is empty. Add experience or skills on the Profile page, or select a base resume."}
-          </p>
+          {!hasApiKey && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Settings className="size-3.5" />
+              <Link
+                href="/settings"
+                className="font-medium text-primary underline underline-offset-2"
+              >
+                Add your Groq API key
+              </Link>{" "}
+              in Settings to enable AI resume tailoring.
+            </p>
+          )}
+          {hasApiKey && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {hasBaseResume
+                ? `The AI will rewrite "${formattedResumes.find((r) => r.value === selectedBaseResume)?.label ?? ""}" to match this job.`
+                : profileHasData
+                  ? "No base resume selected — the AI builds from your profile."
+                  : "Your profile is empty. Add experience or skills on the Profile page, or select a base resume."}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -248,7 +265,7 @@ function ResumeViewerDialog({
         </SheetHeader>
         <div className="px-4 pb-4">
           {resumeQuery.isLoading ? (
-            <Skeleton className="h-96 w-full" />
+            <Skeleton className="h-[calc(100vh-8rem)] w-full" />
           ) : resume ? (
             <Tabs defaultValue="preview" className="gap-3">
               <TabsList variant="line">
@@ -333,7 +350,7 @@ function ResumePdfPreview({ content }: { content: string }) {
   return (
     <iframe
       src={previewUrl}
-      className="h-[calc(100vh-16rem)] w-full rounded-lg border bg-white"
+      className="h-[calc(100vh-8rem)] w-full rounded-lg border bg-white"
       title="PDF preview"
     />
   );

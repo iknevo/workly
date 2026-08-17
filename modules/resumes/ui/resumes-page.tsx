@@ -1,18 +1,58 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { MoreVertical, Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
 import { useTRPC } from "@/trpc/client";
 
+function ResumesPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="mt-2 h-4 w-72" />
+        </div>
+        <Skeleton className="h-9 w-28" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-40 w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ResumesPage() {
+  return (
+    <Suspense fallback={<ResumesPageSkeleton />}>
+      <ErrorBoundary
+        fallback={<p className="text-sm text-muted-foreground">Failed to load resumes.</p>}
+      >
+        <ResumesPageSuspense />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function ResumesPageSuspense() {
   const trpc = useTRPC();
 
   const resumesQuery = useQuery(trpc.resumes.getMany.queryOptions());
@@ -33,13 +73,7 @@ export function ResumesPage() {
         </Link>
       </div>
 
-      {resumesQuery.isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full" />
-          ))}
-        </div>
-      ) : resumes.length === 0 ? (
+      {resumes.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <Empty>
@@ -88,44 +122,38 @@ function ResumeCard({
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-              <FileText className="size-4" />
-            </div>
-            <div className="flex min-w-0 flex-col">
-              <Link
-                href={`/resumes/${resume.id}`}
-                className="truncate text-sm font-semibold hover:underline"
-              >
-                {resume.title}
-              </Link>
-              <span className="text-xs text-muted-foreground">
-                Updated {resume.updatedAt.toLocaleDateString()}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center justify-between gap-2">
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex min-w-0 flex-col">
           <Link
             href={`/resumes/${resume.id}`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className="truncate text-sm font-semibold hover:underline"
           >
-            View
+            {resume.title}
           </Link>
-          <div className="flex items-center gap-1">
-            <Link
-              href={`/resumes/${resume.id}/edit`}
-              className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-            >
-              <Pencil />
-            </Link>
-            <Button variant="ghost" size="icon-sm" onClick={() => remove.mutate({ id: resume.id })}>
-              <Trash2 />
-            </Button>
-          </div>
+          <span className="text-xs text-muted-foreground">
+            Updated {resume.updatedAt.toLocaleDateString()}
+          </span>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+            <MoreVertical />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem render={<Link href={`/resumes/${resume.id}`} />}>
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href={`/resumes/${resume.id}/edit`} />}>
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => remove.mutate({ id: resume.id })}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardContent>
     </Card>
   );
