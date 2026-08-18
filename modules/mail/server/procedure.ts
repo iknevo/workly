@@ -283,6 +283,7 @@ async function performSync(userId: string, applicationId: string) {
       fromEmail: emails.fromEmail,
       subject: emails.subject,
       snippet: emails.snippet,
+      bodyText: emails.bodyText,
     })
     .from(emailApplications)
     .innerJoin(emails, eq(emailApplications.emailId, emails.id))
@@ -294,7 +295,7 @@ async function performSync(userId: string, applicationId: string) {
       from: link.fromEmail ?? "",
       subject: link.subject ?? "",
       snippet: link.snippet ?? "",
-      bodyText: null,
+      bodyText: link.bodyText ?? "",
       context,
     });
     if (!include) stale.push(link.id);
@@ -646,7 +647,7 @@ export const mailRouter = createTRPCRouter({
     .input(z.object({ applicationId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [application] = await db
-        .select({ id: applications.id })
+        .select({ id: applications.id, company: applications.company, mailKeywords: applications.mailKeywords })
         .from(applications)
         .where(and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id)))
         .limit(1);
@@ -655,7 +656,19 @@ export const mailRouter = createTRPCRouter({
       await db
         .delete(emailApplications)
         .where(eq(emailApplications.applicationId, input.applicationId));
-      return performSync(ctx.user.id, input.applicationId);
+
+      const syncResult = await performSync(ctx.user.id, input.applicationId);
+
+      const keywords = (application.mailKeywords ?? []).map((k) => k.trim()).filter(Boolean);
+      const reevalResult = await reevaluateStoredEmails(ctx.user.id, input.applicationId, {
+        companyPhrase: companyPhrase(application.company),
+        keywords,
+      });
+
+      return {
+        insertedCount: syncResult.insertedCount + reevalResult.insertedCount,
+        removedCount: syncResult.removedCount + reevalResult.removedCount,
+      };
     }),
 
   hideEmail: protectedProcedure
