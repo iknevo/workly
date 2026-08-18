@@ -281,6 +281,40 @@ export const applicationsRouter = createTRPCRouter({
       return applicationResume;
     }),
 
+  updateResume: protectedProcedure
+    .input(
+      z.object({
+        resumeId: z.uuid(),
+        applicationId: z.uuid(),
+        content: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { user } = ctx;
+
+      const [application] = await db
+        .select({ id: applications.id })
+        .from(applications)
+        .where(and(eq(applications.id, input.applicationId), eq(applications.userId, user.id)))
+        .limit(1);
+
+      if (!application) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [updated] = await db
+        .update(applicationResumes)
+        .set({ content: input.content, updatedAt: new Date() })
+        .where(
+          and(
+            eq(applicationResumes.id, input.resumeId),
+            eq(applicationResumes.applicationId, input.applicationId)
+          )
+        )
+        .returning();
+
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return updated;
+    }),
+
   deleteResume: protectedProcedure
     .input(z.object({ resumeId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {

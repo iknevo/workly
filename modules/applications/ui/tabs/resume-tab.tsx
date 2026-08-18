@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Settings, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,12 +23,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 
 import { normalizeSkills } from "@/db/schema";
 import { useConfirm } from "@/hooks/use-confirm";
-import { ResumeCodeViewer } from "@/modules/resumes/ui/resume-code-viewer";
 import { useTRPC } from "@/trpc/client";
 
 export function ResumeTab({ applicationId }: { applicationId: string }) {
@@ -256,29 +254,22 @@ function ResumeViewerDialog({
 
   return (
     <Sheet open={resumeId !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="data-[side=right]:sm:max-w-2xl">
+      <SheetContent side="right" className="data-[side=right]:w-full data-[side=right]:sm:max-w-full">
         <SheetHeader>
           <SheetTitle>Tailored resume</SheetTitle>
           <SheetDescription>
-            Generated {resume?.createdAt?.toLocaleString() ?? ""} · PDF preview or LaTeX source.
+            {resume?.createdAt?.toLocaleString() ?? ""} — Edit the LaTeX and preview changes live.
           </SheetDescription>
         </SheetHeader>
-        <div className="px-4 pb-4">
+        <div className="flex h-[calc(100vh-8rem)] flex-col gap-3 px-4 pb-4">
           {resumeQuery.isLoading ? (
-            <Skeleton className="h-[calc(100vh-8rem)] w-full" />
+            <Skeleton className="h-full w-full" />
           ) : resume ? (
-            <Tabs defaultValue="preview" className="gap-3">
-              <TabsList variant="line">
-                <TabsTrigger value="preview">PDF preview</TabsTrigger>
-                <TabsTrigger value="source">LaTeX source</TabsTrigger>
-              </TabsList>
-              <TabsContent value="preview">
-                <ResumePdfPreview key={resume.id} content={resume.content} />
-              </TabsContent>
-              <TabsContent value="source">
-                <ResumeCodeViewer content={resume.content} />
-              </TabsContent>
-            </Tabs>
+            <ResumeEditorInner
+              key={resume.id}
+              resume={resume}
+              applicationId={applicationId}
+            />
           ) : null}
         </div>
       </SheetContent>
@@ -286,72 +277,168 @@ function ResumeViewerDialog({
   );
 }
 
-function ResumePdfPreview({ content }: { content: string }) {
+function ResumeEditorInner({
+  resume,
+  applicationId,
+}: {
+  resume: { id: string; content: string; createdAt: Date };
+  applicationId: string;
+}) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState(resume.content);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const urlRef = useRef<string | null>(null);
+  const [compileStatus, setCompileStatus] = useState<"idle" | "compiling" | "success" | "error">(
+    "idle"
+  );
+  const [compileError, setCompileError] = useState<string | null>(null);
+
+  const previewUrlRef = useRef<string | null>(null);
+  const requestIdRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCompiledRef = useRef<string | null>(null);
 
   const compile = useMutation(trpc.resumes.compile.mutationOptions());
-
+  const compileMutateRef = useRef(compile.mutate);
   useEffect(() => {
-    if (!content.trim()) return;
-    compile.mutate(
-      { content },
+    compileMutateRef.current = compile.mutate;
+  }, [compile.mutate]);
+
+  const save = useMutation(
+    trpc.applications.updateResume.mutationOptions({
+      onSuccess: () => {
+        toast.add({ type: "success", title: "Resume saved" });
+        queryClient.invalidateQueries({
+          queryKey: trpc.applications.getResumes.queryKey({ applicationId }),
+        });
+        queryClient.invalidateQueries({
+          queryKey: trpc.applications.getResume.queryKey({ resumeId: resume.id, applicationId }),
+        });
+      },
+      onError: (error) =>
+        toast.add({ type: "error", title: "Failed to save", description: error.message }),
+    })
+  );
+
+  const compileTex = useCallback((tex: string) => {
+    if (!tex.trim()) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const id = ++requestIdRef.current;
+    setCompileStatus("compiling");
+    setCompileError(null);
+    compileMutateRef.current(
+      { content: tex },
       {
         onSuccess: (result) => {
+          if (id !== requestIdRef.current) return;
+          lastCompiledRef.current = tex;
           const bytes = Uint8Array.from(atob(result.pdfBase64), (c) => c.charCodeAt(0));
           const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-          if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-          urlRef.current = url;
+          if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+          previewUrlRef.current = url;
           setPreviewUrl(url);
-          setError(null);
+          setCompileStatus("success");
         },
-        onError: (compileError) => {
-          setError(compileError.message.slice(0, 300));
+        onError: (error) => {
+          if (id !== requestIdRef.current) return;
+          setCompileError(error.message.slice(0, 300));
+          setCompileStatus("error");
         },
       }
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content]);
+  }, []);
+
+  useEffect(() => {
+    if (content.trim() === "" || content === lastCompiledRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => compileTex(content), 600);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [content, compileTex]);
 
   useEffect(() => {
     return () => {
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, []);
 
-  if (compile.isPending) {
-    return (
-      <div className="flex h-[calc(100vh-16rem)] items-center justify-center rounded-lg border bg-white text-sm text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <Loader2 className="size-4 animate-spin" />
-          Compiling PDF…
-        </span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="max-h-64 overflow-auto rounded-lg bg-destructive/10 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-destructive">
-          {error}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Couldn&apos;t compile a PDF preview. Switch to the LaTeX source tab to view the code.
-        </p>
-      </div>
-    );
-  }
-
-  if (!previewUrl) return null;
-
   return (
-    <iframe
-      src={previewUrl}
-      className="h-[calc(100vh-8rem)] w-full rounded-lg border bg-white"
-      title="PDF preview"
-    />
+    <>
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
+        <div className="flex min-h-0 flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">LaTeX source</span>
+            <span className="text-xs text-muted-foreground">
+              {content.length.toLocaleString()} chars
+            </span>
+          </div>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="min-h-0 flex-1 resize-none rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+            spellCheck={false}
+          />
+        </div>
+        <div className="flex min-h-0 flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">PDF preview</span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {compileStatus === "compiling" && (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Compiling…
+                </>
+              )}
+              {compileStatus === "success" && <span>Compiled</span>}
+              {compileStatus === "error" && <span className="text-destructive">Failed</span>}
+              {compileStatus === "idle" && <span>Waiting…</span>}
+            </span>
+          </div>
+          {compileStatus === "error" && compileError && (
+            <p className="max-h-24 overflow-auto rounded-lg bg-destructive/10 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-destructive">
+              {compileError}
+            </p>
+          )}
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border bg-white">
+            {previewUrl ? (
+              <iframe src={previewUrl} className="size-full" title="PDF preview" />
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {compileStatus === "compiling" ? "Compiling…" : "Preview will appear here"}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => compileTex(content)}
+          disabled={compile.isPending || !content.trim()}
+        >
+          {compile.isPending && <Loader2 className="animate-spin" />}
+          Recompile
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() =>
+            save.mutate({
+              resumeId: resume.id,
+              applicationId,
+              content,
+            })
+          }
+          disabled={save.isPending || !content.trim()}
+        >
+          {save.isPending && <Loader2 className="animate-spin" />}
+          Save
+        </Button>
+      </div>
+    </>
   );
 }
