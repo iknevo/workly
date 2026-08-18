@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
@@ -13,10 +14,17 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
+import { APPLICATION_STATUS_CONFIG, JOB_SOURCES } from "@/modules/applications/constants";
 import { useTRPC } from "@/trpc/client";
 
 const FILTERS = ["all", "applied", "interviewing", "offer", "rejected", "draft"] as const;
@@ -63,23 +71,42 @@ export function ApplicationsList() {
 function ApplicationsListSuspense() {
   const trpc = useTRPC();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
   const applicationsQuery = useQuery(trpc.applications.getMany.queryOptions());
   const applications = useMemo(() => applicationsQuery.data ?? [], [applicationsQuery.data]);
 
+  const availableSources = useMemo(() => {
+    const sources = new Set<string>();
+    for (const app of applications) {
+      if (app.source) sources.add(app.source);
+    }
+    const preset = JOB_SOURCES.filter((s) => sources.has(s));
+    const custom = [...sources]
+      .filter((s) => !JOB_SOURCES.includes(s as (typeof JOB_SOURCES)[number]))
+      .sort();
+    return [...preset, ...custom];
+  }, [applications]);
+
   const filtered = useMemo(() => {
     return applications.filter((app) => {
       const matchesFilter = filter === "all" || app.status === filter;
+      const matchesSource = sourceFilter === "all" || app.source === sourceFilter;
       const query = search.trim().toLowerCase();
       const matchesSearch =
         query.length === 0 ||
         (app.company ?? "").toLowerCase().includes(query) ||
         (app.position ?? "").toLowerCase().includes(query) ||
-        (app.location ?? "").toLowerCase().includes(query);
-      return matchesFilter && matchesSearch;
+        (app.location ?? "").toLowerCase().includes(query) ||
+        (app.source ?? "").toLowerCase().includes(query);
+      return matchesFilter && matchesSource && matchesSearch;
     });
-  }, [applications, filter, search]);
+  }, [applications, filter, sourceFilter, search]);
+
+  const formatDate = (date: Date | string) => {
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,20 +127,38 @@ function ApplicationsListSuspense() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by company, position, or location..."
+            placeholder="Search by company, position, location, or source..."
             className="pl-9"
           />
         </div>
 
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as (typeof FILTERS)[number])}>
-          <TabsList className="w-fit">
-            {FILTERS.map((f) => (
-              <TabsTrigger key={f} value={f}>
-                {f === "all" ? "All" : APPLICATION_STATUS_CONFIG[f].label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as (typeof FILTERS)[number])}>
+            <TabsList className="w-fit">
+              {FILTERS.map((f) => (
+                <TabsTrigger key={f} value={f}>
+                  {f === "all" ? "All" : APPLICATION_STATUS_CONFIG[f].label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {availableSources.length > 0 && (
+            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v ?? "all")}>
+              <SelectTrigger size="sm" className="w-auto">
+                <SelectValue placeholder="All sources" />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                <SelectItem value="all">All sources</SelectItem>
+                {availableSources.map((source) => (
+                  <SelectItem key={source} value={source}>
+                    {source}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -153,17 +198,19 @@ function ApplicationsListSuspense() {
                           {app.company}
                         </span>
                       </div>
-                      <Badge className={cn(config.className)}>{config.label}</Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {app.source && (
+                          <Badge variant="outline" className="rounded-xs text-xs">
+                            {app.source}
+                          </Badge>
+                        )}
+                        <Badge className={cn(config.className, "rounded-xs")}>{config.label}</Badge>
+                      </div>
                     </div>
                     <div className="mt-auto flex items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span className="truncate">{app.location ?? "No location"}</span>
                       <span className="shrink-0">
-                        {app.appliedAt
-                          ? app.appliedAt.toLocaleDateString(undefined, {
-                              month: "short",
-                              day: "numeric",
-                            })
-                          : "Not applied"}
+                        {app.appliedAt ? formatDate(app.appliedAt) : "Not applied"}
                       </span>
                     </div>
                   </CardContent>
