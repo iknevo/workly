@@ -11,6 +11,14 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -171,24 +179,27 @@ export function EventFormDialog({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel>Link to application</FieldLabel>
-                <Select
-                  name={field.name}
-                  value={field.value ?? "none"}
-                  onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                <Combobox
                   items={applicationItems}
+                  value={applicationItems.find((item) => item.value === field.value) ?? null}
+                  onValueChange={(item) => field.onChange(item?.value ?? null)}
+                  autoHighlight
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="No application" />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectItem value="none">No application</SelectItem>
-                    {applicationItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <ComboboxInput
+                    placeholder="Search applications..."
+                    showClear
+                  />
+                  <ComboboxContent>
+                    <ComboboxEmpty>No applications found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item: (typeof applicationItems)[number]) => (
+                        <ComboboxItem key={item.value} value={item}>
+                          {item.label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
