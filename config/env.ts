@@ -13,4 +13,5 @@ export const env = {
   UPSTASH_REDIS_REST_URL: getEnv("UPSTASH_REDIS_REST_URL", false),
   UPSTASH_REDIS_REST_TOKEN: getEnv("UPSTASH_REDIS_REST_TOKEN", false),
   ENCRYPTION_KEY: getEnv("ENCRYPTION_KEY", false),
+  TEXAPI_KEY: getEnv("TEXAPI_KEY", false),
 };

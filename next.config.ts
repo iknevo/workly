@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["node-tectonic"],
+  serverExternalPackages: [],
 
   async redirects() {
     return [
