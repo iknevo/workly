@@ -1,17 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircle2,
-  ExternalLink,
-  Eye,
-  EyeOff,
-  Info,
-  KeyRound,
-  Mail,
-  Trash2,
-  UserRound,
-} from "lucide-react";
+import { CheckCircle2, ExternalLink, Info, KeyRound, Mail, Trash2, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { type SubmitEventHandler, useState } from "react";
@@ -78,14 +68,12 @@ function ApiKeySection() {
   const hasKey = statusQuery.data?.hasKey ?? false;
 
   const [key, setKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const saveMutation = useMutation(
     trpc.users.updateApiKey.mutationOptions({
       onSuccess: () => {
         setKey("");
-        setShowKey(false);
         queryClient.invalidateQueries({ queryKey: trpc.users.getApiKeyStatus.queryKey() });
         toast.add({ title: "API key saved" });
       },
@@ -106,7 +94,7 @@ function ApiKeySection() {
   return (
     <div className="flex flex-col gap-3 py-4">
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium">AI API Key</span>
+        <span className="text-sm font-medium">Groq API Key</span>
         <span className="text-xs text-muted-foreground">
           Your Groq API key for AI resume tailoring. Get one free at console.groq.com.
         </span>
@@ -115,20 +103,12 @@ function ApiKeySection() {
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Input
-            type={showKey ? "text" : "password"}
+            type="password"
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder={hasKey ? "••••••••••••••••" : "gsk_..."}
             autoComplete="off"
           />
-          <button
-            type="button"
-            onClick={() => setShowKey((s) => !s)}
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label={showKey ? "Hide key" : "Show key"}
-          >
-            {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
         </div>
         <Button size="sm" onClick={handleSave} disabled={!key.trim() || saving}>
           Save
@@ -141,7 +121,7 @@ function ApiKeySection() {
       </div>
 
       {hasKey && !key && (
-        <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+        <div className="flex items-center gap-1.5 text-xs text-emerald-600">
           <CheckCircle2 className="size-3.5" />
           Key saved
         </div>
