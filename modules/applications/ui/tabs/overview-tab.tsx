@@ -74,6 +74,7 @@ export function OverviewTab({ application }: { application: Application }) {
             <Detail label="Position" value={application.position} />
             <Detail label="Location" value={application.location} />
             <Detail label="Salary" value={application.salary} />
+            <Detail label="Source" value={application.source} />
             <Detail
               label="Status"
               value={<Badge className={cn(statusConfig.className)}>{statusConfig.label}</Badge>}
@@ -98,22 +99,6 @@ export function OverviewTab({ application }: { application: Application }) {
                   >
                     View posting <ExternalLink className="size-3" />
                   </Link>
-                ) : (
-                  "—"
-                )
-              }
-            />
-            <Detail
-              label="Email search"
-              value={
-                application.mailKeywords && application.mailKeywords.length > 0 ? (
-                  <span className="flex flex-wrap gap-1">
-                    {application.mailKeywords.map((keyword) => (
-                      <code key={keyword} className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                        {keyword}
-                      </code>
-                    ))}
-                  </span>
                 ) : (
                   "—"
                 )
