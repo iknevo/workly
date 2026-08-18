@@ -4,6 +4,7 @@ import { Geist_Mono, Inter } from "next/font/google";
 
 import { cn } from "@/lib/utils";
 
+import { Signature } from "@/components/developer/signature";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -44,6 +45,7 @@ export default function RootLayout({
             <TRPCReactProvider>
               <Toaster />
               <TooltipProvider>{children}</TooltipProvider>
+              <Signature />
             </TRPCReactProvider>
           </ClerkProvider>
         </ThemeProvider>
