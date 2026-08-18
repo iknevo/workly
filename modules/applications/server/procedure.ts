@@ -27,7 +27,7 @@ export const applicationsRouter = createTRPCRouter({
       .select()
       .from(applications)
       .where(eq(applications.userId, user.id))
-      .orderBy(desc(applications.updatedAt));
+      .orderBy(desc(applications.appliedAt), desc(applications.createdAt));
   }),
 
   getOne: protectedProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
@@ -107,6 +107,7 @@ export const applicationsRouter = createTRPCRouter({
           status: input.status ?? "draft",
           salary: input.salary || null,
           appliedAt: input.appliedAt || null,
+          source: input.source || null,
           jobDescription: input.jobDescription || null,
           notes: input.notes || null,
           baseResumeId: input.baseResumeId || null,
@@ -131,6 +132,7 @@ export const applicationsRouter = createTRPCRouter({
         status?: typeof applications.$inferSelect.status;
         salary?: string | null;
         appliedAt?: Date | null;
+        source?: string | null;
         jobDescription?: string | null;
         notes?: string | null;
         baseResumeId?: string | null;
@@ -145,6 +147,7 @@ export const applicationsRouter = createTRPCRouter({
         status: input.status,
         salary: input.salary || null,
         appliedAt: input.appliedAt || null,
+        source: input.source || null,
         jobDescription: input.jobDescription || null,
         notes: input.notes || null,
         baseResumeId: input.baseResumeId || null,

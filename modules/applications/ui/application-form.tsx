@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -24,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import type { applications } from "@/db/schema";
 import { insertApplicationSchema } from "@/db/schema";
-import { APPLICATION_STATUS_CONFIG } from "@/modules/applications/constants";
+import { APPLICATION_STATUS_CONFIG, JOB_SOURCES } from "@/modules/applications/constants";
 
 type Application = typeof applications.$inferSelect;
 
@@ -56,12 +57,16 @@ export function ApplicationForm({
       status: initial?.status ?? "draft",
       salary: initial?.salary ?? "",
       appliedAt: initial?.appliedAt ?? null,
+      source: initial?.source ?? "",
       jobDescription: initial?.jobDescription ?? "",
       notes: initial?.notes ?? "",
     },
   });
 
   const [company, position] = useWatch({ control: form.control, name: ["company", "position"] });
+  const [otherSelected, setOtherSelected] = useState(
+    () => !!initial?.source && !JOB_SOURCES.includes(initial.source as (typeof JOB_SOURCES)[number])
+  );
 
   const statusItems = Object.entries(APPLICATION_STATUS_CONFIG).map(([value, config]) => ({
     value,
@@ -167,6 +172,53 @@ export function ApplicationForm({
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
+          />
+          <Controller
+            name="source"
+            control={form.control}
+            render={({ field }) => {
+              const presetMatch = JOB_SOURCES.find((s) => s === field.value);
+              return (
+                <Field>
+                  <FieldLabel>Source</FieldLabel>
+                  <Select
+                    name={field.name}
+                    value={otherSelected ? "other" : (presetMatch ?? "")}
+                    onValueChange={(value) => {
+                      if (value === "other") {
+                        setOtherSelected(true);
+                        field.onChange("");
+                      } else {
+                        setOtherSelected(false);
+                        field.onChange(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Where did you apply?" />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {JOB_SOURCES.map((source) => (
+                          <SelectItem key={source} value={source}>
+                            {source}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {otherSelected && (
+                    <Input
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      placeholder="Enter source"
+                      className="mt-2"
+                    />
+                  )}
+                </Field>
+              );
+            }}
           />
           <Controller
             name="appliedAt"

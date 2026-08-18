@@ -1,9 +1,12 @@
 import type { applicationStatus, eventType } from "@/db/schema";
 
-export const APPLICATION_STATUS_CONFIG: Record<
-  (typeof applicationStatus.enumValues)[number],
-  { label: string; className: string }
-> = {
+type Config = { label: string; className: string };
+type StatusConfig = Record<(typeof applicationStatus.enumValues)[number], Config>;
+type TypeConfig = Record<(typeof eventType.enumValues)[number], Config>;
+
+export const JOB_SOURCES = ["LinkedIn", "Indeed", "Glassdoor", "Wuzzuf", "Wellfound"] as const;
+
+export const APPLICATION_STATUS_CONFIG: StatusConfig = {
   draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
   applied: { label: "Applied", className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
   interviewing: {
@@ -18,10 +21,7 @@ export const APPLICATION_STATUS_CONFIG: Record<
   },
 };
 
-export const EVENT_TYPE_CONFIG: Record<
-  (typeof eventType.enumValues)[number],
-  { label: string; className: string }
-> = {
+export const EVENT_TYPE_CONFIG: TypeConfig = {
   application: {
     label: "Application",
     className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",

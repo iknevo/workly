@@ -244,6 +244,7 @@ export const applications = pgTable(
     status: applicationStatus("status").default("draft").notNull(),
     salary: text("salary"),
     appliedAt: timestamp("applied_at"),
+    source: text("source"),
     jobDescription: text("job_description"),
     notes: text("notes"),
     baseResumeId: uuid("base_resume_id").references(() => resumes.id, {
