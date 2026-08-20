@@ -223,3 +223,30 @@
 .calendar-shell .fc .fc-list-event:hover td {
   background-color: var(--accent);
 }
+
+@media (max-width: 640px) {
+  .calendar-shell .fc .fc-toolbar.fc-header-toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .calendar-shell .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+
+  .calendar-shell .fc .fc-button {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .calendar-shell .fc .fc-daygrid-day-number,
+  .calendar-shell .fc .fc-col-header-cell-cushion {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .calendar-shell .fc .fc-event-title,
+  .calendar-shell .fc .fc-event-time {
+    font-size: 0.7rem;
+  }
+}

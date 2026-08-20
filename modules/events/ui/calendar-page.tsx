@@ -19,9 +19,16 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { addDays, addMinutes, endOfMonth, startOfMonth, subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -40,7 +47,7 @@ import { useTRPC } from "@/trpc/client";
 const FullCalendar = dynamic(() => import("@fullcalendar/react"), {
   ssr: false,
   loading: () => <Skeleton className="h-[70vh] w-full rounded-lg" />,
-});
+}) as React.ComponentType<CalendarOptions & { ref?: React.RefObject<unknown | null> }>;
 
 type Event = typeof events.$inferSelect;
 
@@ -62,42 +69,63 @@ function toEventInput(event: Event): EventInput {
   };
 }
 
-const CALENDAR_OPTIONS: CalendarOptions = {
-  plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin],
-  height: "auto",
-  nowIndicator: true,
-  navLinks: true,
-  editable: true,
-  eventResizableFromStart: true,
-  selectable: true,
-  selectMirror: true,
-  dayMaxEvents: true,
-  firstDay: 1,
-  slotDuration: "00:30:00",
-  slotLabelFormat: { hour: "numeric", minute: "2-digit", omitZeroMinute: true, meridiem: "short" },
-  eventTimeFormat: { hour: "numeric", minute: "2-digit", omitZeroMinute: true, meridiem: "short" },
-  headerToolbar: {
-    left: "title",
-    center: "",
-    right: "prev,next today dayGridMonth,timeGridWeek,timeGridDay,listWeek",
-  },
-  buttonText: {
-    today: "Today",
-    month: "Month",
-    week: "Week",
-    day: "Day",
-    list: "List",
-  },
-  views: {
-    timeGridWeek: { slotMinTime: "08:00:00", slotMaxTime: "20:00:00" },
-    timeGridDay: { slotMinTime: "08:00:00", slotMaxTime: "20:00:00" },
-  },
-};
+const VIEW_OPTIONS = [
+  { value: "dayGridMonth", label: "Month" },
+  { value: "timeGridWeek", label: "Week" },
+  { value: "timeGridDay", label: "Day" },
+  { value: "listWeek", label: "List" },
+] as const;
+
+const viewItems = VIEW_OPTIONS.map((opt) => ({
+  value: opt.value,
+  label: opt.label,
+}));
+
+function getCalendarOptions(): CalendarOptions {
+  return {
+    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin],
+    height: "auto",
+    nowIndicator: true,
+    navLinks: true,
+    editable: true,
+    eventResizableFromStart: true,
+    selectable: true,
+    selectMirror: true,
+    dayMaxEvents: true,
+    firstDay: 1,
+    slotDuration: "00:30:00",
+    slotLabelFormat: {
+      hour: "numeric",
+      minute: "2-digit",
+      omitZeroMinute: true,
+      meridiem: "short",
+    },
+    eventTimeFormat: {
+      hour: "numeric",
+      minute: "2-digit",
+      omitZeroMinute: true,
+      meridiem: "short",
+    },
+    headerToolbar: { left: "prev,next today", center: "title", right: "" },
+    buttonText: {
+      today: "Today",
+      month: "Month",
+      week: "Week",
+      day: "Day",
+      list: "List",
+    },
+    views: {
+      timeGridWeek: { slotMinTime: "08:00:00", slotMaxTime: "20:00:00" },
+      timeGridDay: { slotMinTime: "08:00:00", slotMaxTime: "20:00:00" },
+    },
+  };
+}
 
 export function CalendarPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const calendarRef = useRef<any>(null);
 
   const [range, setRange] = useState({
     start: subDays(startOfMonth(new Date()), 7),
@@ -107,8 +135,9 @@ export function CalendarPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [defaultStartTime, setDefaultStartTime] = useState<Date | undefined>(undefined);
   const [defaultEndTime, setDefaultEndTime] = useState<Date | undefined>(undefined);
+  const [currentView, setCurrentView] = useState(isMobile ? "listWeek" : "timeGridWeek");
 
-  const initialView = isMobile ? "listWeek" : "timeGridWeek";
+  const initialView = currentView;
 
   const eventsQuery = useQuery(
     trpc.events.getManyForMonth.queryOptions(
@@ -184,6 +213,12 @@ export function CalendarPage() {
     );
   };
 
+  const handleViewChange = (value: string | null) => {
+    if (!value) return;
+    setCurrentView(value);
+    calendarRef.current?.getApi().changeView(value);
+  };
+
   const handleEventResize = (arg: EventResizeDoneArg) => {
     const existing = events.find((e) => e.id === arg.event.id);
     if (!existing || !arg.event.start || !arg.event.end) {
@@ -203,13 +238,25 @@ export function CalendarPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg font-medium">Calendar</h1>
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-medium">Calendar</h1>
+          <Select value={currentView} onValueChange={handleViewChange} items={viewItems}>
+            <SelectTrigger size="sm" className="w-auto">
+              <SelectValue placeholder="View" />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {viewItems.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={() => openCreateSheet()}>
+            <Plus />
+            Add event
+          </Button>
         </div>
-        <Button size="sm" onClick={() => openCreateSheet()}>
-          <Plus />
-          Add event
-        </Button>
       </div>
 
       {eventsQuery.isPending ? (
@@ -217,7 +264,8 @@ export function CalendarPage() {
       ) : (
         <div className="calendar-shell rounded-lg border bg-background p-2 shadow-sm sm:p-4">
           <FullCalendar
-            {...CALENDAR_OPTIONS}
+            ref={calendarRef}
+            {...getCalendarOptions()}
             initialView={initialView}
             events={eventInputs}
             datesSet={handleDatesSet}
