@@ -9,6 +9,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,7 +61,9 @@ export function ApplicationsList() {
   return (
     <Suspense fallback={<ApplicationsListSkeleton />}>
       <ErrorBoundary
-        fallback={<p className="text-sm text-muted-foreground">Failed to load applications.</p>}
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
       >
         <ApplicationsListSuspense />
       </ErrorBoundary>
@@ -107,6 +110,10 @@ function ApplicationsListSuspense() {
   const formatDate = (date: Date | string) => {
     return formatDistanceToNow(new Date(date), { addSuffix: true });
   };
+
+  if (applicationsQuery.isPending) {
+    return <ApplicationsListSkeleton />;
+  }
 
   return (
     <div className="flex flex-col gap-6">

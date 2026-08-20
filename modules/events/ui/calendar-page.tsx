@@ -20,7 +20,10 @@ import { addDays, addMinutes, endOfMonth, startOfMonth, subDays } from "date-fns
 import { Plus } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useRef, useState } from "react";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -92,7 +95,7 @@ function getCalendarOptions(): CalendarOptions {
     selectable: true,
     selectMirror: true,
     dayMaxEvents: true,
-    firstDay: 1,
+    firstDay: 6,
     slotDuration: "00:30:00",
     slotLabelFormat: {
       hour: "numeric",
@@ -121,7 +124,36 @@ function getCalendarOptions(): CalendarOptions {
   };
 }
 
+function CalendarPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-5 w-24" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+      </div>
+      <Skeleton className="h-[70vh] w-full rounded-lg" />
+    </div>
+  );
+}
+
 export function CalendarPage() {
+  return (
+    <Suspense fallback={<CalendarPageSkeleton />}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
+      >
+        <CalendarPageContent />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function CalendarPageContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();

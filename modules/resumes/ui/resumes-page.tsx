@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -45,7 +46,9 @@ export function ResumesPage() {
   return (
     <Suspense fallback={<ResumesPageSkeleton />}>
       <ErrorBoundary
-        fallback={<p className="text-sm text-muted-foreground">Failed to load resumes.</p>}
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
       >
         <ResumesPageSuspense />
       </ErrorBoundary>
@@ -58,6 +61,10 @@ function ResumesPageSuspense() {
 
   const resumesQuery = useQuery(trpc.resumes.getMany.queryOptions());
   const resumes = resumesQuery.data ?? [];
+
+  if (resumesQuery.isPending) {
+    return <ResumesPageSkeleton />;
+  }
 
   return (
     <div className="flex flex-col gap-6">

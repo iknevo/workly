@@ -5,7 +5,10 @@ import { CheckCircle2, ExternalLink, Info, KeyRound, Mail, Trash2, UserRound } f
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { type SubmitEventHandler, useState } from "react";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -169,7 +172,52 @@ function ApiKeySection() {
   );
 }
 
+function SettingsPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="mt-2 h-4 w-72" />
+      </div>
+      <Card>
+        <CardContent className="flex flex-col divide-y">
+          <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+            <div className="flex flex-col gap-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+            <Skeleton className="h-5 w-9" />
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4">
+            <div className="flex flex-col gap-1">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+            <Skeleton className="h-7 w-24" />
+          </div>
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsPageSkeleton />}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
+      >
+        <SettingsPageContent />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function SettingsPageContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { resolvedTheme, setTheme } = useTheme();

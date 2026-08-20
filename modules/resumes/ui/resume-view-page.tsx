@@ -4,7 +4,10 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Eye, Loader2, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +24,42 @@ import { toast } from "@/components/ui/toast";
 import { ResumeCodeViewer } from "./resume-code-viewer";
 import { useTRPC } from "@/trpc/client";
 
+function ResumeViewPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-7" />
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="mt-1 h-4 w-40" />
+          </div>
+        </div>
+      </div>
+      <Card className="p-0">
+        <CardContent className="p-2">
+          <Skeleton className="h-96 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ResumeViewPage({ resumeId }: { resumeId: string }) {
+  return (
+    <Suspense fallback={<ResumeViewPageSkeleton />}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
+      >
+        <ResumeViewPageContent resumeId={resumeId} />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function ResumeViewPageContent({ resumeId }: { resumeId: string }) {
   const trpc = useTRPC();
 
   const resumeQuery = useQuery(trpc.resumes.getOne.queryOptions({ id: resumeId }));

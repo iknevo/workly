@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
@@ -36,7 +37,9 @@ export function ProfilePage() {
   return (
     <Suspense fallback={<ProfilePageSkeleton />}>
       <ErrorBoundary
-        fallback={<p className="text-sm text-muted-foreground">Failed to load profile.</p>}
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
       >
         <ProfilePageSuspense />
       </ErrorBoundary>

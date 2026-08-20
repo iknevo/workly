@@ -13,7 +13,8 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { ErrorFallback } from "@/components/error-fallback";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -68,7 +70,38 @@ function isProfileSectionFilled(key: string, value: unknown): boolean {
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Skeleton className="h-48 w-full lg:col-span-3" />
+        <Skeleton className="h-48 w-full lg:col-span-2" />
+      </div>
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
+
 export function Dashboard() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <ErrorBoundary fallbackRender={({ error, resetErrorBoundary }) => <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />}>
+        <DashboardContent />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const trpc = useTRPC();
   const { user } = useUser();
   const now = useState(() => Date.now())[0];
@@ -126,6 +159,10 @@ export function Dashboard() {
     if (hour < 18) return "Good afternoon";
     return "Good evening";
   }, [now]);
+
+  if (applicationsQuery.isPending || meQuery.isPending) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="flex flex-col gap-6">

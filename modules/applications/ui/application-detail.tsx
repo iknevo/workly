@@ -3,13 +3,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorFallback } from "@/components/error-fallback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -20,7 +22,34 @@ import { ResumeTab } from "@/modules/applications/ui/tabs/resume-tab";
 import { TimelineTab } from "@/modules/applications/ui/tabs/timeline-tab";
 import { useTRPC } from "@/trpc/client";
 
+function ApplicationDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-7" />
+        <Skeleton className="h-8 w-72" />
+      </div>
+      <Skeleton className="h-9 w-80" />
+      <Card>
+        <CardContent className="py-10">
+          <Skeleton className="h-40 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
+  return (
+    <Suspense fallback={<ApplicationDetailSkeleton />}>
+      <ErrorBoundary fallbackRender={({ error, resetErrorBoundary }) => <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />}>
+        <ApplicationDetailContent applicationId={applicationId} />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function ApplicationDetailContent({ applicationId }: { applicationId: string }) {
   const trpc = useTRPC();
   const [tab, setTab] = useState("overview");
 
