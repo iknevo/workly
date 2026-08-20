@@ -35,6 +35,7 @@ import { toast } from "@/components/ui/toast";
 
 import type { events } from "@/db/schema";
 import { insertEventSchema } from "@/db/schema";
+import { useConfirm } from "@/hooks/use-confirm";
 import { EVENT_TYPE_CONFIG } from "@/modules/applications/constants";
 import { useTRPC } from "@/trpc/client";
 
@@ -68,6 +69,7 @@ export function EventFormDialog({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   const isEditing = initial != null;
   const linkedApplicationId = initial?.applicationId ?? applicationId ?? null;
@@ -165,236 +167,248 @@ export function EventFormDialog({
     }
   };
 
+  async function handleDelete() {
+    if (!initial) return;
+    const ok = await confirm({
+      title: "Delete event",
+      message: "This event will be permanently deleted. This can't be undone.",
+    });
+    if (ok) remove.mutate({ id: initial.id });
+  }
+
   return (
-    <form
-      id="event-form"
-      onSubmit={form.handleSubmit(onSubmit)}
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
-        {!applicationId && (
+    <>
+      <ConfirmDialog />
+      <form
+        id="event-form"
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+          {!applicationId && (
+            <Controller
+              name="applicationId"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Link to application</FieldLabel>
+                  <Combobox
+                    items={applicationItems}
+                    value={applicationItems.find((item) => item.value === field.value) ?? null}
+                    onValueChange={(item) => field.onChange(item?.value ?? null)}
+                    autoHighlight
+                  >
+                    <ComboboxInput placeholder="Search applications..." showClear />
+                    <ComboboxContent>
+                      <ComboboxEmpty>No applications found.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(item: (typeof applicationItems)[number]) => (
+                          <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          )}
+
           <Controller
-            name="applicationId"
+            name="title"
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel>Link to application</FieldLabel>
-                <Combobox
-                  items={applicationItems}
-                  value={applicationItems.find((item) => item.value === field.value) ?? null}
-                  onValueChange={(item) => field.onChange(item?.value ?? null)}
-                  autoHighlight
-                >
-                  <ComboboxInput placeholder="Search applications..." showClear />
-                  <ComboboxContent>
-                    <ComboboxEmpty>No applications found.</ComboboxEmpty>
-                    <ComboboxList>
-                      {(item: (typeof applicationItems)[number]) => (
-                        <ComboboxItem key={item.value} value={item}>
-                          {item.label}
-                        </ComboboxItem>
-                      )}
-                    </ComboboxList>
-                  </ComboboxContent>
-                </Combobox>
+                <FieldLabel htmlFor="event-title">Title</FieldLabel>
+                <Input {...field} id="event-title" placeholder="Phone screen with recruiter" />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
           />
-        )}
 
-        <Controller
-          name="title"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="event-title">Title</FieldLabel>
-              <Input {...field} id="event-title" placeholder="Phone screen with recruiter" />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
-
-        <Controller
-          name="type"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel>Type</FieldLabel>
-              <Select
-                name={field.name}
-                value={field.value ?? "other"}
-                onValueChange={field.onChange}
-                items={typeItems}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a type" />
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  {typeItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
-
-        <Controller
-          name="startTime"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel>Starts</FieldLabel>
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="outline"
-                        className="min-w-0 flex-1 justify-start text-left font-normal"
-                      />
-                    }
-                  >
-                    <CalendarIcon className="mr-2 size-4 shrink-0" />
-                    {field.value ? (
-                      <span className="truncate">{format(field.value, "PPP")}</span>
-                    ) : (
-                      <span className="truncate text-muted-foreground">Pick a date</span>
-                    )}
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value ?? undefined}
-                      onSelect={(date) => {
-                        if (date) {
-                          field.onChange(
-                            mergeTime(date, field.value ? toTimeString(field.value) : "09:00")
-                          );
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <TimePicker
-                  value={field.value ? toTimeString(field.value) : ""}
-                  onChange={(time) => field.onChange(mergeTime(field.value ?? new Date(), time))}
-                  className="w-30"
-                />
-              </div>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
-
-        <Controller
-          name="endTime"
-          control={form.control}
-          render={({ field, fieldState }) => {
-            const value = field.value;
-            const enabled = value != null;
-            return (
+          <Controller
+            name="type"
+            control={form.control}
+            render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="event-end-time"
-                    checked={enabled}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        field.onChange(addMinutes(startTime ?? new Date(), 60));
-                      } else {
-                        field.onChange(null);
-                      }
-                    }}
-                  />
-                  <FieldLabel htmlFor="event-end-time">End time</FieldLabel>
-                </div>
-                {enabled && value && (
-                  <div className="flex items-center gap-2">
-                    <Popover>
-                      <PopoverTrigger
-                        render={
-                          <Button
-                            variant="outline"
-                            className="min-w-0 flex-1 justify-start text-left font-normal"
-                          />
-                        }
-                      >
-                        <CalendarIcon className="mr-2 size-4 shrink-0" />
-                        <span className="truncate">{format(value, "PPP")}</span>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={value}
-                          onSelect={(date) => {
-                            if (date) field.onChange(mergeTime(date, toTimeString(value)));
-                          }}
-                          autoFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <TimePicker
-                      value={toTimeString(value)}
-                      onChange={(time) => field.onChange(mergeTime(value, time))}
-                      className="w-30"
-                    />
-                  </div>
-                )}
+                <FieldLabel>Type</FieldLabel>
+                <Select
+                  name={field.name}
+                  value={field.value ?? "other"}
+                  onValueChange={field.onChange}
+                  items={typeItems}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a type" />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    {typeItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
-            );
-          }}
-        />
+            )}
+          />
 
-        <Controller
-          name="description"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="event-description">Description</FieldLabel>
-              <Textarea
-                {...field}
-                id="event-description"
-                value={field.value ?? ""}
-                placeholder="Zoom link, interviewer name..."
-                rows={3}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
+          <Controller
+            name="startTime"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel>Starts</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          className="min-w-0 flex-1 justify-start text-left font-normal"
+                        />
+                      }
+                    >
+                      <CalendarIcon className="mr-2 size-4 shrink-0" />
+                      {field.value ? (
+                        <span className="truncate">{format(field.value, "PPP")}</span>
+                      ) : (
+                        <span className="truncate text-muted-foreground">Pick a date</span>
+                      )}
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ?? undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            field.onChange(
+                              mergeTime(date, field.value ? toTimeString(field.value) : "09:00")
+                            );
+                          }
+                        }}
+                        autoFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <TimePicker
+                    value={field.value ? toTimeString(field.value) : ""}
+                    onChange={(time) => field.onChange(mergeTime(field.value ?? new Date(), time))}
+                    className="w-30"
+                  />
+                </div>
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+
+          <Controller
+            name="endTime"
+            control={form.control}
+            render={({ field, fieldState }) => {
+              const value = field.value;
+              const enabled = value != null;
+              return (
+                <Field data-invalid={fieldState.invalid}>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="event-end-time"
+                      checked={enabled}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          field.onChange(addMinutes(startTime ?? new Date(), 60));
+                        } else {
+                          field.onChange(null);
+                        }
+                      }}
+                    />
+                    <FieldLabel htmlFor="event-end-time">End time</FieldLabel>
+                  </div>
+                  {enabled && value && (
+                    <div className="flex items-center gap-2">
+                      <Popover>
+                        <PopoverTrigger
+                          render={
+                            <Button
+                              variant="outline"
+                              className="min-w-0 flex-1 justify-start text-left font-normal"
+                            />
+                          }
+                        >
+                          <CalendarIcon className="mr-2 size-4 shrink-0" />
+                          <span className="truncate">{format(value, "PPP")}</span>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={value}
+                            onSelect={(date) => {
+                              if (date) field.onChange(mergeTime(date, toTimeString(value)));
+                            }}
+                            autoFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <TimePicker
+                        value={toTimeString(value)}
+                        onChange={(time) => field.onChange(mergeTime(value, time))}
+                        className="w-30"
+                      />
+                    </div>
+                  )}
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              );
+            }}
+          />
+
+          <Controller
+            name="description"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="event-description">Description</FieldLabel>
+                <Textarea
+                  {...field}
+                  id="event-description"
+                  value={field.value ?? ""}
+                  placeholder="Zoom link, interviewer name..."
+                  rows={3}
+                />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
+          {isEditing && (
+            <Button
+              variant="ghost"
+              type="button"
+              className="mr-auto text-destructive hover:text-destructive"
+              onClick={handleDelete}
+              disabled={remove.isPending}
+            >
+              {remove.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Delete
+            </Button>
           )}
-        />
-      </div>
-
-      <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
-        {isEditing && (
-          <Button
-            variant="ghost"
-            type="button"
-            className="mr-auto text-destructive hover:text-destructive"
-            onClick={() => initial && remove.mutate({ id: initial.id })}
-            disabled={remove.isPending}
-          >
-            {remove.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            Delete
+          <Button variant="ghost" type="button" onClick={onClose}>
+            Cancel
           </Button>
-        )}
-        <Button variant="ghost" type="button" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={create.isPending || update.isPending || !title.trim() || !startTime}
-        >
-          {(create.isPending || update.isPending) && <Loader2 className="animate-spin" />}
-          {isEditing ? "Save changes" : "Add event"}
-        </Button>
-      </div>
-    </form>
+          <Button
+            type="submit"
+            disabled={create.isPending || update.isPending || !title.trim() || !startTime}
+          >
+            {(create.isPending || update.isPending) && <Loader2 className="animate-spin" />}
+            {isEditing ? "Save changes" : "Add event"}
+          </Button>
+        </div>
+      </form>
+    </>
   );
 }

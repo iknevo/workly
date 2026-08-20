@@ -19,6 +19,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
+import { useConfirm } from "@/hooks/use-confirm";
 import { useTRPC } from "@/trpc/client";
 
 function ResumesPageSkeleton() {
@@ -108,6 +109,7 @@ function ResumeCard({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   const remove = useMutation(
     trpc.resumes.remove.mutationOptions({
@@ -120,41 +122,49 @@ function ResumeCard({
     })
   );
 
+  async function handleDelete() {
+    const ok = await confirm({
+      title: "Delete resume",
+      message: `"${resume.title}" will be permanently deleted. This can't be undone.`,
+    });
+    if (ok) remove.mutate({ id: resume.id });
+  }
+
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="flex min-w-0 flex-col">
-          <Link
-            href={`/resumes/${resume.id}`}
-            className="truncate text-sm font-semibold hover:underline"
-          >
-            {resume.title}
-          </Link>
-          <span className="text-xs text-muted-foreground">
-            Updated {resume.updatedAt.toLocaleDateString()}
-          </span>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
-            <MoreVertical />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem render={<Link href={`/resumes/${resume.id}`} />}>
-              View
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href={`/resumes/${resume.id}/edit`} />}>
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() => remove.mutate({ id: resume.id })}
+    <>
+      <ConfirmDialog />
+      <Card>
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="flex min-w-0 flex-col">
+            <Link
+              href={`/resumes/${resume.id}`}
+              className="truncate text-sm font-semibold hover:underline"
             >
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </CardContent>
-    </Card>
+              {resume.title}
+            </Link>
+            <span className="text-xs text-muted-foreground">
+              Updated {resume.updatedAt.toLocaleDateString()}
+            </span>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
+              <MoreVertical />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem render={<Link href={`/resumes/${resume.id}`} />}>
+                View
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href={`/resumes/${resume.id}/edit`} />}>
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardContent>
+      </Card>
+    </>
   );
 }
