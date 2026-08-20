@@ -4,7 +4,14 @@ type Config = { label: string; className: string };
 type StatusConfig = Record<(typeof applicationStatus.enumValues)[number], Config>;
 type TypeConfig = Record<(typeof eventType.enumValues)[number], Config>;
 
-export const JOB_SOURCES = ["LinkedIn", "Indeed", "Glassdoor", "Wuzzuf", "Wellfound"] as const;
+export const JOB_SOURCES = [
+  "LinkedIn",
+  "Indeed",
+  "Naukrigulf",
+  "Glassdoor",
+  "Wuzzuf",
+  "Wellfound",
+] as const;
 
 export const APPLICATION_STATUS_CONFIG: StatusConfig = {
   draft: { label: "Draft", className: "bg-muted text-muted-foreground" },

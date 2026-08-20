@@ -100,7 +100,7 @@ export function OverviewTab({ application }: { application: Application }) {
                     View posting <ExternalLink className="size-3" />
                   </Link>
                 ) : (
-                  "—"
+                  "-"
                 )
               }
             />
@@ -153,7 +153,7 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm">{value ?? "—"}</dd>
+      <dd className="text-sm">{value ?? "-"}</dd>
     </div>
   );
 }

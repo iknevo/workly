@@ -14,7 +14,7 @@ import { TRPCReactProvider } from "@/trpc/client";
 
 export const metadata: Metadata = {
   title: {
-    default: "Workly — Job Application Tracker",
+    default: "Workly | Job Application Tracker",
     template: "%s | Workly",
   },
   description:

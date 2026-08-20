@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Settings, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,7 +111,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
             Tailor your resume
           </CardTitle>
           <CardDescription>
-            Pick a base resume and the AI will rewrite it to match this job&apos;s description — or
+            Pick a base resume and the AI will rewrite it to match this job&apos;s description - or
             skip it and generate straight from your profile. Add the job description on the Overview
             tab first.
           </CardDescription>
@@ -168,7 +168,7 @@ export function ResumeTab({ applicationId }: { applicationId: string }) {
               {hasBaseResume
                 ? `The AI will rewrite "${formattedResumes.find((r) => r.value === selectedBaseResume)?.label ?? ""}" to match this job.`
                 : profileHasData
-                  ? "No base resume selected — the AI builds from your profile."
+                  ? "No base resume selected - the AI builds from your profile."
                   : "Your profile is empty. Add experience or skills on the Profile page, or select a base resume."}
             </p>
           )}
@@ -254,22 +254,21 @@ function ResumeViewerDialog({
 
   return (
     <Sheet open={resumeId !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="data-[side=right]:w-full data-[side=right]:sm:max-w-full">
+      <SheetContent
+        side="right"
+        className="data-[side=right]:w-full data-[side=right]:sm:max-w-full"
+      >
         <SheetHeader>
           <SheetTitle>Tailored resume</SheetTitle>
           <SheetDescription>
-            {resume?.createdAt?.toLocaleString() ?? ""} — Edit the LaTeX and preview changes live.
+            {resume?.createdAt?.toLocaleString() ?? ""} - Edit the LaTeX and preview changes live.
           </SheetDescription>
         </SheetHeader>
         <div className="flex h-[calc(100vh-8rem)] flex-col gap-3 px-4 pb-4">
           {resumeQuery.isLoading ? (
             <Skeleton className="h-full w-full" />
           ) : resume ? (
-            <ResumeEditorInner
-              key={resume.id}
-              resume={resume}
-              applicationId={applicationId}
-            />
+            <ResumeEditorInner key={resume.id} resume={resume} applicationId={applicationId} />
           ) : null}
         </div>
       </SheetContent>
@@ -377,7 +376,7 @@ function ResumeEditorInner({
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="min-h-0 flex-1 resize-none rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+            className="min-h-0 flex-1 resize-none rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed focus:ring-1 focus:ring-ring focus:outline-none"
             spellCheck={false}
           />
         </div>

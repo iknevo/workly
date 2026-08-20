@@ -277,7 +277,7 @@ function EducationProjectEntry({
           Project #{projectIndex + 1}
         </span>
         {!open && summary && (
-          <span className="truncate text-sm text-muted-foreground">— {summary}</span>
+          <span className="truncate text-sm text-muted-foreground">- {summary}</span>
         )}
         <div className="ml-auto">
           <Button variant="ghost" size="icon-sm" onClick={onRemove} aria-label="Remove project">

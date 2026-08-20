@@ -12,7 +12,7 @@ export const RESUME_MAX_RESUME_CHARS = 16000;
 
 function truncate(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars)}\n\n[truncated — review the full job description if needed]`;
+  return `${text.slice(0, maxChars)}\n\n[truncated - review the full job description if needed]`;
 }
 
 export function isAIEnabled(): boolean {

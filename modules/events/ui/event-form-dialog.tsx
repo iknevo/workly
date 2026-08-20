@@ -154,7 +154,7 @@ export function EventFormDialog({
   }));
   const applicationItems = applications.map((app) => ({
     value: app.id,
-    label: `${app.company} — ${app.position}`,
+    label: `${app.company} - ${app.position}`,
   }));
 
   const onSubmit = (values: EventFormValues) => {
@@ -185,10 +185,7 @@ export function EventFormDialog({
                   onValueChange={(item) => field.onChange(item?.value ?? null)}
                   autoHighlight
                 >
-                  <ComboboxInput
-                    placeholder="Search applications..."
-                    showClear
-                  />
+                  <ComboboxInput placeholder="Search applications..." showClear />
                   <ComboboxContent>
                     <ComboboxEmpty>No applications found.</ComboboxEmpty>
                     <ComboboxList>

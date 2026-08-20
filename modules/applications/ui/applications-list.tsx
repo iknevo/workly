@@ -127,21 +127,23 @@ function ApplicationsListSuspense() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by company, position, location, or source..."
+            placeholder="Search applications..."
             className="pl-9"
           />
         </div>
 
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as (typeof FILTERS)[number])}>
-            <TabsList className="w-fit">
-              {FILTERS.map((f) => (
-                <TabsTrigger key={f} value={f}>
-                  {f === "all" ? "All" : APPLICATION_STATUS_CONFIG[f].label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as (typeof FILTERS)[number])}>
+              <TabsList className="w-fit">
+                {FILTERS.map((f) => (
+                  <TabsTrigger key={f} value={f}>
+                    {f === "all" ? "All" : APPLICATION_STATUS_CONFIG[f].label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
 
           {availableSources.length > 0 && (
             <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v ?? "all")}>
@@ -198,7 +200,7 @@ function ApplicationsListSuspense() {
                           {app.company}
                         </span>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                         {app.source && (
                           <Badge variant="outline" className="rounded-xs text-xs">
                             {app.source}

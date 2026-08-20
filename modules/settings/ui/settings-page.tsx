@@ -311,7 +311,7 @@ export function SettingsPage() {
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium">Email tracking</span>
                 <span className="text-xs text-muted-foreground">
-                  Not configured — add ENCRYPTION_KEY to your environment to connect email accounts.
+                  Not configured - add ENCRYPTION_KEY to your environment to connect email accounts.
                 </span>
               </div>
             ) : (

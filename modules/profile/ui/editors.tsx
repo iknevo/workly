@@ -149,7 +149,7 @@ export function SectionCard({
           </button>
           <span className="text-xs font-semibold text-muted-foreground">#{index + 1}</span>
           {!open && summary && (
-            <span className="truncate text-sm text-muted-foreground">— {summary}</span>
+            <span className="truncate text-sm text-muted-foreground">- {summary}</span>
           )}
           <div className="ml-auto">
             <Button variant="ghost" size="icon-sm" onClick={onRemove} aria-label="Remove entry">
