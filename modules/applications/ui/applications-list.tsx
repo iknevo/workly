@@ -193,11 +193,11 @@ function ApplicationsListSuspense() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((app) => {
             const config = APPLICATION_STATUS_CONFIG[app.status];
             return (
-              <Link key={app.id} href={`/applications/${app.id}`}>
+              <Link key={app.id} href={`/applications/${app.id}`} className="min-w-0">
                 <Card className="h-full transition-colors hover:border-primary/50">
                   <CardContent className="flex h-full flex-col gap-3 p-4">
                     <div className="flex items-start justify-between gap-2">
