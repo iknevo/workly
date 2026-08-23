@@ -8,10 +8,10 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ErrorFallback } from "@/components/error-fallback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -42,7 +42,11 @@ function ApplicationDetailSkeleton() {
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
   return (
     <Suspense fallback={<ApplicationDetailSkeleton />}>
-      <ErrorBoundary fallbackRender={({ error, resetErrorBoundary }) => <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
+      >
         <ApplicationDetailContent applicationId={applicationId} />
       </ErrorBoundary>
     </Suspense>

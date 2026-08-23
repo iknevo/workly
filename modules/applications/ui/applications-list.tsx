@@ -1,10 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
@@ -16,6 +16,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,10 +34,28 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { APPLICATION_STATUS_CONFIG, JOB_SOURCES } from "@/modules/applications/constants";
+import {
+  APPLICATIONS_PAGE_SIZE,
+  APPLICATION_STATUS_CONFIG,
+  JOB_SOURCES,
+} from "@/modules/applications/constants";
 import { useTRPC } from "@/trpc/client";
 
 const FILTERS = ["all", "applied", "interviewing", "offer", "rejected", "draft"] as const;
+
+function getPageNumbers(current: number, totalPages: number): (number | "ellipsis")[] {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  const wanted = new Set([1, totalPages, current - 1, current, current + 1]);
+  const sorted = [...wanted].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  const pages: (number | "ellipsis")[] = [];
+  let previous = 0;
+  for (const p of sorted) {
+    if (p - previous > 1) pages.push("ellipsis");
+    pages.push(p);
+    previous = p;
+  }
+  return pages;
+}
 
 function ApplicationsListSkeleton() {
   return (
@@ -75,37 +102,52 @@ function ApplicationsListSuspense() {
   const trpc = useTRPC();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  const applicationsQuery = useQuery(trpc.applications.getMany.queryOptions());
-  const applications = useMemo(() => applicationsQuery.data ?? [], [applicationsQuery.data]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const handleFilterChange = (value: string) => {
+    setFilter(value as (typeof FILTERS)[number]);
+    setPage(1);
+  };
+
+  const handleSourceChange = (value: string | null) => {
+    setSourceFilter(value ?? "all");
+    setPage(1);
+  };
+
+  const applicationsQuery = useQuery({
+    ...trpc.applications.getPaginated.queryOptions({
+      page,
+      pageSize: APPLICATIONS_PAGE_SIZE,
+      status: filter === "all" ? undefined : filter,
+      source: sourceFilter === "all" ? undefined : sourceFilter,
+      search: search || undefined,
+    }),
+    placeholderData: keepPreviousData,
+  });
+  const applicationsQuerySources = useQuery(trpc.applications.getSources.queryOptions());
+
+  const applications = useMemo(() => applicationsQuery.data?.items ?? [], [applicationsQuery.data]);
+  const total = applicationsQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / APPLICATIONS_PAGE_SIZE));
 
   const availableSources = useMemo(() => {
-    const sources = new Set<string>();
-    for (const app of applications) {
-      if (app.source) sources.add(app.source);
-    }
-    const preset = JOB_SOURCES.filter((s) => sources.has(s));
-    const custom = [...sources]
-      .filter((s) => !JOB_SOURCES.includes(s as (typeof JOB_SOURCES)[number]))
-      .sort();
+    const sources = applicationsQuerySources.data ?? [];
+    const preset = JOB_SOURCES.filter((s) => sources.includes(s));
+    const custom = sources.filter((s) => !JOB_SOURCES.includes(s as (typeof JOB_SOURCES)[number]));
     return [...preset, ...custom];
-  }, [applications]);
+  }, [applicationsQuerySources.data]);
 
-  const filtered = useMemo(() => {
-    return applications.filter((app) => {
-      const matchesFilter = filter === "all" || app.status === filter;
-      const matchesSource = sourceFilter === "all" || app.source === sourceFilter;
-      const query = search.trim().toLowerCase();
-      const matchesSearch =
-        query.length === 0 ||
-        (app.company ?? "").toLowerCase().includes(query) ||
-        (app.position ?? "").toLowerCase().includes(query) ||
-        (app.location ?? "").toLowerCase().includes(query) ||
-        (app.source ?? "").toLowerCase().includes(query);
-      return matchesFilter && matchesSource && matchesSearch;
-    });
-  }, [applications, filter, sourceFilter, search]);
+  const hasActiveFilters = filter !== "all" || sourceFilter !== "all" || search.length > 0;
 
   const formatDate = (date: Date | string) => {
     return formatDistanceToNow(new Date(date), { addSuffix: true });
@@ -119,9 +161,7 @@ function ApplicationsListSuspense() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Applications ({filtered.length})
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Applications ({total})</h1>
           <p className="text-sm text-muted-foreground">Track every job you&apos;ve applied to.</p>
         </div>
         <Link href="/applications/new" className={buttonVariants({ size: "sm" })}>
@@ -134,8 +174,8 @@ function ApplicationsListSuspense() {
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search applications..."
             className="pl-9"
           />
@@ -143,7 +183,7 @@ function ApplicationsListSuspense() {
 
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <Tabs value={filter} onValueChange={(v) => setFilter(v as (typeof FILTERS)[number])}>
+            <Tabs value={filter} onValueChange={handleFilterChange}>
               <TabsList className="w-fit">
                 {FILTERS.map((f) => (
                   <TabsTrigger key={f} value={f}>
@@ -155,7 +195,7 @@ function ApplicationsListSuspense() {
           </div>
 
           {availableSources.length > 0 && (
-            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v ?? "all")}>
+            <Select value={sourceFilter} onValueChange={handleSourceChange}>
               <SelectTrigger size="sm" className="w-auto">
                 <SelectValue placeholder="All sources" />
               </SelectTrigger>
@@ -172,21 +212,19 @@ function ApplicationsListSuspense() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {total === 0 ? (
         <Card>
           <CardContent className="py-10">
             <Empty>
               <EmptyHeader>
-                <EmptyTitle>
-                  {applications.length === 0 ? "No applications yet" : "No matches"}
-                </EmptyTitle>
+                <EmptyTitle>{!hasActiveFilters ? "No applications yet" : "No matches"}</EmptyTitle>
                 <EmptyDescription>
-                  {applications.length === 0
+                  {!hasActiveFilters
                     ? "Start tracking your job search by adding your first application."
                     : "Try adjusting your search or filters."}
                 </EmptyDescription>
               </EmptyHeader>
-              {applications.length === 0 && (
+              {!hasActiveFilters && (
                 <Link href="/applications/new" className={buttonVariants({ size: "sm" })}>
                   Add application
                 </Link>
@@ -195,41 +233,99 @@ function ApplicationsListSuspense() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((app) => {
-            const config = APPLICATION_STATUS_CONFIG[app.status];
-            return (
-              <Link key={app.id} href={`/applications/${app.id}`} className="min-w-0">
-                <Card className="h-full transition-colors hover:border-primary/50">
-                  <CardContent className="flex h-full flex-col gap-3 p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-semibold">{app.position}</span>
-                        <span className="truncate text-sm text-muted-foreground">
-                          {app.company}
+        <>
+          <div
+            className={cn(
+              "grid gap-3 transition-opacity sm:grid-cols-2 lg:grid-cols-3",
+              applicationsQuery.isPlaceholderData && "pointer-events-none opacity-60"
+            )}
+          >
+            {applications.map((app) => {
+              const config = APPLICATION_STATUS_CONFIG[app.status];
+              return (
+                <Link key={app.id} href={`/applications/${app.id}`} className="min-w-0">
+                  <Card className="h-full transition-colors hover:border-primary/50">
+                    <CardContent className="flex h-full flex-col gap-3 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-semibold">{app.position}</span>
+                          <span className="truncate text-sm text-muted-foreground">
+                            {app.company}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                          {app.source && (
+                            <Badge variant="outline" className="rounded-xs text-xs">
+                              {app.source}
+                            </Badge>
+                          )}
+                          <Badge className={cn(config.className, "rounded-xs")}>
+                            {config.label}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="mt-auto flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="truncate">{app.location ?? "No location"}</span>
+                        <span className="shrink-0">
+                          {app.appliedAt ? formatDate(app.appliedAt) : "Not applied"}
                         </span>
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                        {app.source && (
-                          <Badge variant="outline" className="rounded-xs text-xs">
-                            {app.source}
-                          </Badge>
-                        )}
-                        <Badge className={cn(config.className, "rounded-xs")}>{config.label}</Badge>
-                      </div>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span className="truncate">{app.location ?? "No location"}</span>
-                      <span className="shrink-0">
-                        {app.appliedAt ? formatDate(app.appliedAt) : "Not applied"}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    aria-disabled={page === 1}
+                    className={cn(page === 1 && "pointer-events-none opacity-50")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                  />
+                </PaginationItem>
+                {getPageNumbers(page, totalPages).map((p, i) =>
+                  p === "ellipsis" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        href="#"
+                        isActive={p === page}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(p);
+                        }}
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    aria-disabled={page === totalPages}
+                    className={cn(page === totalPages && "pointer-events-none opacity-50")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       )}
     </div>
   );

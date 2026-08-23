@@ -18,11 +18,11 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import { cn } from "@/lib/utils";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { ErrorFallback } from "@/components/error-fallback";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -94,7 +94,11 @@ function DashboardSkeleton() {
 export function Dashboard() {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <ErrorBoundary fallbackRender={({ error, resetErrorBoundary }) => <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
+      >
         <DashboardContent />
       </ErrorBoundary>
     </Suspense>

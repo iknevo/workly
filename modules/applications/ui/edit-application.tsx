@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { ErrorFallback } from "@/components/error-fallback";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ErrorFallback } from "@/components/error-fallback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 
@@ -42,7 +42,11 @@ function EditApplicationSkeleton() {
 export function EditApplication({ applicationId }: { applicationId: string }) {
   return (
     <Suspense fallback={<EditApplicationSkeleton />}>
-      <ErrorBoundary fallbackRender={({ error, resetErrorBoundary }) => <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <ErrorFallback error={error as Error} resetErrorBoundary={resetErrorBoundary} />
+        )}
+      >
         <EditApplicationContent applicationId={applicationId} />
       </ErrorBoundary>
     </Suspense>

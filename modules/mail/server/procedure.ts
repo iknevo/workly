@@ -647,7 +647,11 @@ export const mailRouter = createTRPCRouter({
     .input(z.object({ applicationId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [application] = await db
-        .select({ id: applications.id, company: applications.company, mailKeywords: applications.mailKeywords })
+        .select({
+          id: applications.id,
+          company: applications.company,
+          mailKeywords: applications.mailKeywords,
+        })
         .from(applications)
         .where(and(eq(applications.id, input.applicationId), eq(applications.userId, ctx.user.id)))
         .limit(1);

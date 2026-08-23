@@ -31,6 +31,8 @@ export function OverviewTab({ application }: { application: Application }) {
       onSuccess: () => {
         toast.add({ type: "success", title: "Application deleted" });
         queryClient.invalidateQueries({ queryKey: trpc.applications.getMany.queryKey() });
+        queryClient.invalidateQueries({ queryKey: trpc.applications.getPaginated.queryKey() });
+        queryClient.invalidateQueries({ queryKey: trpc.applications.getSources.queryKey() });
         router.push("/applications");
       },
       onError: (error) =>

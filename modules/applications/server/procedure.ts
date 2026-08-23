@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { type SQLWrapper, and, asc, count, desc, eq, ilike, isNotNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateTailoredResume } from "@/lib/ai";
@@ -11,13 +11,19 @@ import { env } from "@/config/env";
 import { db } from "@/db";
 import {
   applicationResumes,
+  applicationStatus,
   applications,
   insertApplicationSchema,
   resumes,
   updateApplicationSchema,
   users,
 } from "@/db/schema";
+import { APPLICATIONS_PAGE_SIZE } from "@/modules/applications/constants";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
 
 export const applicationsRouter = createTRPCRouter({
   getMany: protectedProcedure.query(async ({ ctx }) => {
@@ -28,6 +34,59 @@ export const applicationsRouter = createTRPCRouter({
       .from(applications)
       .where(eq(applications.userId, user.id))
       .orderBy(desc(applications.appliedAt), desc(applications.createdAt));
+  }),
+
+  getPaginated: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(APPLICATIONS_PAGE_SIZE),
+        status: z.enum(applicationStatus.enumValues).optional(),
+        source: z.string().min(1).optional(),
+        search: z.string().trim().max(200).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { user } = ctx;
+
+      const conditions: (SQLWrapper | undefined)[] = [eq(applications.userId, user.id)];
+      if (input.status) conditions.push(eq(applications.status, input.status));
+      if (input.source) conditions.push(eq(applications.source, input.source));
+      if (input.search) {
+        const term = `%${escapeLike(input.search)}%`;
+        conditions.push(
+          or(
+            ilike(applications.company, term),
+            ilike(applications.position, term),
+            ilike(applications.location, term),
+            ilike(applications.source, term)
+          )
+        );
+      }
+      const where = and(...conditions);
+
+      const [items, totals] = await Promise.all([
+        db
+          .select()
+          .from(applications)
+          .where(where)
+          .orderBy(desc(applications.appliedAt), desc(applications.createdAt))
+          .limit(input.pageSize)
+          .offset((input.page - 1) * input.pageSize),
+        db.select({ total: count() }).from(applications).where(where),
+      ]);
+
+      return { items, total: totals[0]?.total ?? 0 };
+    }),
+
+  getSources: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .selectDistinct({ source: applications.source })
+      .from(applications)
+      .where(and(eq(applications.userId, ctx.user.id), isNotNull(applications.source)))
+      .orderBy(asc(applications.source));
+
+    return rows.map((row) => row.source).filter((source): source is string => source !== null);
   }),
 
   getOne: protectedProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {

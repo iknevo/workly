@@ -1,8 +1,7 @@
 import { env } from "@/config/env";
 
 export type CompileResult =
-  | { ok: true; pdfBase64: string; log: string }
-  | { ok: false; error: string };
+  { ok: true; pdfBase64: string; log: string } | { ok: false; error: string };
 
 const MATH_ERROR_HINT = `This error is usually caused by an unclosed math delimiter.
 Check for a lone "$" or a single "\\[" in the source. To add vertical spacing
@@ -13,8 +12,7 @@ function hasLoneDisplayMathOpen(tex: string): boolean {
 }
 
 function addMathHint(error: string, tex: string): string {
-  const mathLike =
-    /display math should end/i.test(error) || /missing \$ inserted/i.test(error);
+  const mathLike = /display math should end/i.test(error) || /missing \$ inserted/i.test(error);
   if (mathLike || hasLoneDisplayMathOpen(tex)) {
     return `${error}\n\n${MATH_ERROR_HINT}`;
   }
@@ -27,8 +25,7 @@ export async function compileLatex(tex: string): Promise<CompileResult> {
   if (!env.TEXAPI_KEY) {
     return {
       ok: false,
-      error:
-        "TEXAPI_KEY is not configured. Add your Texapi API key to environment variables.",
+      error: "TEXAPI_KEY is not configured. Add your Texapi API key to environment variables.",
     };
   }
 

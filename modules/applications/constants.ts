@@ -4,6 +4,8 @@ type Config = { label: string; className: string };
 type StatusConfig = Record<(typeof applicationStatus.enumValues)[number], Config>;
 type TypeConfig = Record<(typeof eventType.enumValues)[number], Config>;
 
+export const APPLICATIONS_PAGE_SIZE = 12;
+
 export const JOB_SOURCES = [
   "LinkedIn",
   "Indeed",
