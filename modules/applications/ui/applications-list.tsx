@@ -119,7 +119,9 @@ function ApplicationsListSuspense() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Applications</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Applications ({filtered.length})
+          </h1>
           <p className="text-sm text-muted-foreground">Track every job you&apos;ve applied to.</p>
         </div>
         <Link href="/applications/new" className={buttonVariants({ size: "sm" })}>
