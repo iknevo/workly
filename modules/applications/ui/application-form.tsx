@@ -56,7 +56,7 @@ export function ApplicationForm({
       url: initial?.url ?? "",
       status: initial?.status ?? "draft",
       salary: initial?.salary ?? "",
-      appliedAt: initial?.appliedAt ?? null,
+      appliedAt: initial?.appliedAt ?? new Date(),
       source: initial?.source ?? "",
       jobDescription: initial?.jobDescription ?? "",
       notes: initial?.notes ?? "",
