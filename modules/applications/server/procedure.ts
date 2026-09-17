@@ -1,5 +1,16 @@
 import { TRPCError } from "@trpc/server";
-import { type SQLWrapper, and, asc, count, desc, eq, ilike, isNotNull, or } from "drizzle-orm";
+import {
+  type SQL,
+  type SQLWrapper,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  isNotNull,
+  or,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import { generateTailoredResume } from "@/lib/ai";
@@ -25,6 +36,31 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+function buildFilters(
+  userId: string,
+  filters: {
+    status?: (typeof applicationStatus.enumValues)[number];
+    source?: string;
+    search?: string;
+  } = {}
+): SQL<unknown> | undefined {
+  const conditions: (SQLWrapper | undefined)[] = [eq(applications.userId, userId)];
+  if (filters.status) conditions.push(eq(applications.status, filters.status));
+  if (filters.source) conditions.push(eq(applications.source, filters.source));
+  if (filters.search) {
+    const term = `%${escapeLike(filters.search)}%`;
+    conditions.push(
+      or(
+        ilike(applications.company, term),
+        ilike(applications.position, term),
+        ilike(applications.location, term),
+        ilike(applications.source, term)
+      )
+    );
+  }
+  return and(...conditions);
+}
+
 export const applicationsRouter = createTRPCRouter({
   getMany: protectedProcedure.query(async ({ ctx }) => {
     const { user } = ctx;
@@ -48,22 +84,7 @@ export const applicationsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const { user } = ctx;
-
-      const conditions: (SQLWrapper | undefined)[] = [eq(applications.userId, user.id)];
-      if (input.status) conditions.push(eq(applications.status, input.status));
-      if (input.source) conditions.push(eq(applications.source, input.source));
-      if (input.search) {
-        const term = `%${escapeLike(input.search)}%`;
-        conditions.push(
-          or(
-            ilike(applications.company, term),
-            ilike(applications.position, term),
-            ilike(applications.location, term),
-            ilike(applications.source, term)
-          )
-        );
-      }
-      const where = and(...conditions);
+      const where = buildFilters(user.id, input);
 
       const [items, totals] = await Promise.all([
         db
@@ -77,6 +98,25 @@ export const applicationsRouter = createTRPCRouter({
       ]);
 
       return { items, total: totals[0]?.total ?? 0 };
+    }),
+
+  getFiltered: protectedProcedure
+    .input(
+      z.object({
+        status: z.enum(applicationStatus.enumValues).optional(),
+        source: z.string().min(1).optional(),
+        search: z.string().trim().max(200).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { user } = ctx;
+      const where = buildFilters(user.id, input);
+
+      return db
+        .select()
+        .from(applications)
+        .where(where)
+        .orderBy(desc(applications.appliedAt), desc(applications.createdAt));
     }),
 
   getSources: protectedProcedure.query(async ({ ctx }) => {

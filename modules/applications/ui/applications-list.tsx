@@ -1,8 +1,8 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { Plus, Search } from "lucide-react";
+import { Download, LoaderCircle, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 import { ErrorFallback } from "@/components/error-fallback";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
@@ -33,12 +33,14 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/toast";
 
 import {
   APPLICATIONS_PAGE_SIZE,
   APPLICATION_STATUS_CONFIG,
   JOB_SOURCES,
 } from "@/modules/applications/constants";
+import { exportToPdf } from "@/modules/applications/lib/export";
 import { useTRPC } from "@/trpc/client";
 
 const FILTERS = ["all", "applied", "interviewing", "offer", "rejected", "draft"] as const;
@@ -100,11 +102,13 @@ export function ApplicationsList() {
 
 function ApplicationsListSuspense() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -153,6 +157,41 @@ function ApplicationsListSuspense() {
     return formatDistanceToNow(new Date(date), { addSuffix: true });
   };
 
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const apps = await queryClient.fetchQuery(
+        trpc.applications.getFiltered.queryOptions({
+          status: filter === "all" ? undefined : filter,
+          source: sourceFilter === "all" ? undefined : sourceFilter,
+          search: search || undefined,
+        })
+      );
+      if (apps.length === 0) {
+        toast.add({
+          type: "warning",
+          title: "Nothing to export",
+          description: "No applications match your current filters.",
+        });
+        return;
+      }
+      await exportToPdf(apps);
+      toast.add({
+        type: "success",
+        title: `Exported ${apps.length} application${apps.length === 1 ? "" : "s"}`,
+      });
+    } catch (error) {
+      toast.add({
+        type: "error",
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Something went wrong.",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (applicationsQuery.isPending) {
     return <ApplicationsListSkeleton />;
   }
@@ -164,10 +203,16 @@ function ApplicationsListSuspense() {
           <h1 className="text-2xl font-semibold tracking-tight">Applications ({total})</h1>
           <p className="text-sm text-muted-foreground">Track every job you&apos;ve applied to.</p>
         </div>
-        <Link href="/applications/new" className={buttonVariants({ size: "sm" })}>
-          <Plus />
-          New application
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+            {exporting ? <LoaderCircle className="animate-spin" /> : <Download />}
+            Export
+          </Button>
+          <Link href="/applications/new" className={buttonVariants({ size: "sm" })}>
+            <Plus />
+            New application
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
