@@ -1,164 +1,147 @@
 # Workly
 
-NOTE: this is totally generated AI slop
+Workly is a job-application workspace for managing the full process from discovering an opportunity to preparing a tailored resume, scheduling interviews, and tracking the final outcome.
 
-A job application tracker with AI-powered resume tailoring, email integration, and calendar scheduling.
+It combines a structured application pipeline with resume tooling, AI-assisted tailoring, recruiter email matching, interview scheduling, and a profile editor. The project is designed as a server-backed application rather than a simple CRUD dashboard: authentication, typed procedures, encrypted credentials, rate limiting, and external integrations are all part of the architecture.
 
 ## Features
 
-- **Application Pipeline** — Track jobs through Draft → Applied → Interviewing → Offer → Rejected → Withdrawn
-- **LaTeX Resumes** — Store, edit, and compile resumes to PDF via TexAPI
-- **AI Resume Tailoring** — Automatically rewrite resumes to match job descriptions using Groq AI
-- **Email Integration** — Connect IMAP accounts (Gmail, Yahoo, iCloud) and auto-match recruiter emails to applications
-- **Calendar** — Schedule interviews, follow-ups, deadlines, and other events with FullCalendar
-- **Dashboard** — Overview of pipeline stats, upcoming events, and profile completeness
+- **Application pipeline** with Draft, Applied, Interviewing, Offer, Rejected, and Withdrawn states
+- Application details with overview, timeline, linked resume, and recruiter email tabs
+- **Resume management** with editable LaTeX source, rendered PDF output, and resume-to-application linking
+- **AI resume tailoring** that adapts resume content to a job description through Groq and the Vercel AI SDK
+- **Email integration** for IMAP accounts, recruiter-message matching, and application-linked email history
+- **Calendar** for interviews, follow-ups, deadlines, offers, and other events
+- Dashboard with pipeline statistics and upcoming activity
+- Profile editor for basics, experience, education, skills, projects, and links
+- Secure storage for connected email credentials using AES-256-GCM encryption
+- Optional Upstash Redis rate limiting for sensitive operations
 
-## Tech Stack
+## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) |
-| UI | React 19, shadcn/ui, Tailwind CSS v4 |
-| API | tRPC, TanStack React Query |
-| Database | PostgreSQL (Neon), Drizzle ORM |
-| Auth | Clerk |
-| AI | Groq API (Vercel AI SDK) |
-| Email | imapflow (IMAP) |
+| Area | Technology |
+| --- | --- |
+| Framework | Next.js 16 App Router, React 19, TypeScript |
+| UI | Tailwind CSS 4, shadcn/ui, React Hook Form |
+| API | tRPC, TanStack Query, Zod |
+| Database | PostgreSQL with Neon and Drizzle ORM |
+| Authentication | Clerk |
+| AI | Groq through the Vercel AI SDK |
+| Email | IMAP via imapflow and mailparser |
+| Documents | LaTeX compilation through TexAPI, PDF generation with jsPDF |
 | Calendar | FullCalendar |
-| Rate Limiting | Upstash Redis |
-| Validation | Zod |
-| Forms | react-hook-form |
-| Package Manager | Bun |
+| Infrastructure | Upstash Redis, Clerk webhooks, optional ngrok |
+| Package manager | Bun |
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (package manager)
-- Node.js 20+
-- A [Neon](https://neon.tech/) PostgreSQL database
-- A [Clerk](https://clerk.com/) account
+- Node.js 20 or newer
+- [Bun](https://bun.sh/)
+- A PostgreSQL database, such as [Neon](https://neon.tech/)
+- A [Clerk](https://clerk.com/) application
 
-### Install
+### Installation
 
 ```bash
+git clone https://github.com/iknevo/workly.git
+cd workly
 bun install
-```
-
-### Environment Setup
-
-```bash
 cp .env.example .env
 ```
 
-Fill in the required variables in `.env` (see [Environment Variables](#environment-variables) below).
-
-### Database
+Fill in the required environment variables, push the database schema, and start the app:
 
 ```bash
 bun run db:push
-```
-
-### Development
-
-```bash
 bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-To test Clerk webhooks locally (requires [ngrok](https://ngrok.com/)):
-
-```bash
-bun run dev:all
-```
-
-Then update the ngrok URL in `package.json` and configure the webhook in your Clerk dashboard pointing to `POST /api/users/webhook`.
-
-## Available Scripts
-
-| Script | Description |
-|---|---|
-| `bun run dev` | Start Next.js dev server |
-| `bun run build` | Production build |
-| `bun run start` | Start production server |
-| `bun run lint` | Run ESLint |
-| `bun run format` | Format with Prettier |
-| `bun run typecheck` | TypeScript type checking |
-| `bun run db:push` | Push Drizzle schema to database |
-| `bun run db:studio` | Open Drizzle Studio (DB browser) |
-| `bun run dev:all` | Dev server + ngrok for webhooks |
-
-## Project Structure
-
-```
-workly/
-├── app/                    # Next.js App Router pages & API routes
-│   ├── (auth)/             # Sign-in / Sign-up pages
-│   ├── (app)/              # Authenticated app pages
-│   │   ├── dashboard/      # Overview dashboard
-│   │   ├── applications/   # Job application CRUD + detail tabs
-│   │   ├── resumes/        # LaTeX resume management
-│   │   ├── calendar/       # Event scheduling
-│   │   ├── profile/        # Profile editor
-│   │   └── settings/       # API keys, email accounts, theme
-│   └── api/                # tRPC handler + Clerk webhook
-├── components/ui/          # shadcn/ui components
-├── config/                 # Environment variable config
-├── db/                     # Drizzle schema & client
-├── hooks/                  # Custom React hooks
-├── lib/                    # Server utilities (AI, email, encryption, LaTeX)
-├── modules/                # Feature modules (server procedures + UI)
-│   ├── applications/
-│   ├── resumes/
-│   ├── events/
-│   ├── mail/
-│   ├── profile/
-│   ├── dashboard/
-│   ├── settings/
-│   └── users/
-└── trpc/                   # tRPC setup (init, routers, client/server helpers)
-```
-
-## Environment Variables
+## Environment variables
 
 ### Required
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | Neon PostgreSQL connection string |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `CLERK_SECRET_KEY` | Clerk secret key |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | Clerk webhook verification secret |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Sign-in route (e.g. `/sign-in`) |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Sign-up route (e.g. `/sign-up`) |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Post-sign-in redirect (e.g. `/`) |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Post-sign-up redirect (e.g. `/`) |
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Client-side Clerk key |
+| `CLERK_SECRET_KEY` | Server-side Clerk key |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Verifies Clerk user webhooks |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Sign-in route |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Sign-up route |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Sign-in fallback destination |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Sign-up fallback destination |
+| `DATABASE_URL` | PostgreSQL connection string |
 
-### Optional
+### Optional integrations
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_APP_URL` | App base URL (for tRPC client) |
-| `GROQ_API_KEY` | Server-side Groq API key for AI resume tailoring |
-| `ENCRYPTION_KEY` | Base64-encoded 32-byte key for AES-256-GCM (required for email integration) |
-| `TEXAPI_KEY` | TexAPI key for LaTeX-to-PDF compilation |
-| `UPSTASH_REDIS_REST_URL` | Upstash Redis URL for rate limiting |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis token |
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Public application URL |
+| `GROQ_API_KEY` | AI resume tailoring |
+| `ENCRYPTION_KEY` | Base64-encoded 32-byte AES-256-GCM key for email credentials |
+| `TEXAPI_KEY` | LaTeX-to-PDF compilation |
+| `UPSTASH_REDIS_REST_URL` | Redis endpoint for rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Redis authentication token |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google calendar/email integration credentials |
+| `GOOGLE_REDIRECT_URI` | OAuth callback URL |
+
+Integrations that are not configured remain unavailable; the core application still requires Clerk and PostgreSQL.
+
+## Available scripts
+
+| Command | Description |
+| --- | --- |
+| `bun run dev` | Start the Next.js development server |
+| `bun run dev:all` | Start the app and the configured ngrok webhook tunnel |
+| `bun run build` | Create a production build |
+| `bun run start` | Start the production server |
+| `bun run lint` | Run ESLint |
+| `bun run typecheck` | Run TypeScript checks |
+| `bun run format` | Format TypeScript and TSX files |
+| `bun run db:push` | Apply the Drizzle schema to PostgreSQL |
+| `bun run db:studio` | Open Drizzle Studio |
+
+## Project structure
+
+```text
+app/
+├── (auth)/              # Clerk sign-in and sign-up routes
+├── (app)/               # Authenticated dashboard and feature pages
+└── api/                 # tRPC handler and Clerk webhook
+modules/
+├── applications/        # Pipeline, details, timeline, email, and resume tabs
+├── dashboard/           # Overview metrics and activity
+├── events/              # Calendar events
+├── mail/                # Email browsing and matching
+├── profile/             # Profile editor
+├── resumes/             # LaTeX resume creation and editing
+└── users/               # User provisioning and profile procedures
+lib/
+├── ai.ts                # AI resume-tailoring helpers
+├── email-matching.ts    # Recruiter email matching
+├── encryption.ts        # Credential encryption
+├── imap.ts              # IMAP access
+├── latex.ts             # LaTeX compilation integration
+└── rate-limit.ts        # Optional Redis-backed rate limiting
+```
+
+## Architecture notes
+
+Workly uses tRPC procedures as the typed boundary between the Next.js UI and server logic. Drizzle models the application domain in PostgreSQL, while feature-specific procedures and UI modules keep applications, resumes, events, mail, and profiles independently maintainable.
+
+External credentials are never intended to be stored as plaintext: email credentials are encrypted before persistence, and optional rate limiting protects expensive or sensitive operations. Clerk webhooks keep the local user record synchronized with authentication events.
 
 ## Deployment
 
-Workly is built for serverless deployment (e.g. Vercel) with Neon's serverless PostgreSQL driver.
+Workly can be deployed to a serverless host such as Vercel with Neon PostgreSQL:
 
-1. Set all required environment variables in your hosting platform
-2. Run `bun run db:push` to apply the schema to your database
-3. Configure the Clerk webhook endpoint to `POST /api/users/webhook` pointing to your production URL
-4. Build and deploy:
-
-```bash
-bun run build
-bun run start
-```
+1. Configure the required environment variables in the host.
+2. Apply the schema with `bun run db:push`.
+3. Point the Clerk webhook to `POST /api/users/webhook`.
+4. Build with `bun run build` and deploy.
 
 ## License
 
